@@ -22,6 +22,8 @@ jobs:
           git lfs install
           git lfs track "model/*.pkl"
           git add .gitattributes
+          git rm --cached model/outing_model.pkl
+          git add model/outing_model.pkl
           git commit -m "Track model files with LFS" || true
           git remote add space https://TobenaiTsuru:$HF_TOKEN@huggingface.co/spaces/TobenaiTsuru/outing-planner
           git push space main --force
