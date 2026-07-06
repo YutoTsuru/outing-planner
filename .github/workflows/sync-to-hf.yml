@@ -17,9 +17,11 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-         git lfs install
-         git lfs track "model/*.pkl"
-         git add .gitattributes
-         git commit -m "Track model files with LFS" || true
-         git remote add space https://TobenaiTsuru:$HF_TOKEN@huggingface.co/spaces/TobenaiTsuru/outing-planner
-         git push space main --force
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git lfs install
+          git lfs track "model/*.pkl"
+          git add .gitattributes
+          git commit -m "Track model files with LFS" || true
+          git remote add space https://TobenaiTsuru:$HF_TOKEN@huggingface.co/spaces/TobenaiTsuru/outing-planner
+          git push space main --force
