@@ -105,11 +105,14 @@ def recommend(temperature, rain_probability, wind_speed, humidity):
 
 # 空・雲をイメージした、淡い青系のデザイン
 CSS = """
-/* 空をイメージしたグラデーション背景 */
+/* 全体 */
 .gradio-container {
     background: linear-gradient(180deg, #c9e6ff 0%, #e6f3ff 55%, #ffffff 100%) !important;
+    width: min(100%, 860px) !important;
     max-width: 860px !important;
     margin: 0 auto !important;
+    padding: 24px !important;
+    box-sizing: border-box !important;
 }
 
 /* タイトルと説明文 */
@@ -117,9 +120,11 @@ CSS = """
     text-align: center;
     margin-top: 8px;
 }
+
 #app-description {
     text-align: center;
     color: #46698c;
+    margin-bottom: 20px;
 }
 
 /* カード型のエリア（入力・結果で共通） */
@@ -129,6 +134,12 @@ CSS = """
     padding: 20px !important;
     box-shadow: 0 4px 14px rgba(90, 150, 210, 0.18);
     margin-bottom: 16px;
+    box-sizing: border-box;
+}
+
+/* 入力行 */
+.weather-row {
+    gap: 16px !important;
 }
 
 /* フッターの注意書き */
@@ -136,6 +147,73 @@ CSS = """
     text-align: center;
     color: #7d9ab5;
     font-size: 0.85em;
+}
+
+/* スマホ向け */
+@media (max-width: 560px) {
+    .gradio-container {
+        padding: 12px !important;
+    }
+
+    #app-title h1 {
+        font-size: 1.55rem !important;
+        line-height: 1.35 !important;
+    }
+
+    #app-description {
+        font-size: 0.92rem;
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+
+    .card {
+        padding: 14px !important;
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+
+    .card h3 {
+        font-size: 1.05rem !important;
+    }
+
+    /* 横並びのスライダーを縦積みにする */
+    .weather-row {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    .weather-row > * {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* ボタンを押しやすい高さ・横幅にする */
+    .card .gr-button {
+        width: 100% !important;
+        min-height: 48px !important;
+        font-size: 1rem !important;
+    }
+
+    /* 結果表示エリアの文字を読みやすくする */
+    .card textarea,
+    .card input {
+        font-size: 16px !important;
+    }
+}
+
+/* タブレット向け */
+@media (min-width: 561px) and (max-width: 768px) {
+    .gradio-container {
+        padding: 20px !important;
+    }
+
+    .card {
+        padding: 18px !important;
+    }
+
+    .weather-row {
+        gap: 12px !important;
+    }
 }
 """
 
@@ -155,19 +233,20 @@ def create_app():
         # --- 入力エリア（カード） ---
         with gr.Column(elem_classes="card"):
             gr.Markdown("### 🌤️ 今日の天気を入力")
-            with gr.Row():
+            with gr.Row(elem_classes="weather-row"):
                 temperature = gr.Slider(
                     minimum=-10, maximum=40, value=22, step=0.5, label="気温（℃）"
                 )
                 rain_probability = gr.Slider(
-                    minimum=0, maximum=100, value=20, step=5, label="降水確率（%）"
+                minimum=0, maximum=100, value=20, step=5, label="降水確率（%）"
                 )
-            with gr.Row():
+
+            with gr.Row(elem_classes="weather-row"):
                 wind_speed = gr.Slider(
-                    minimum=0, maximum=20, value=3, step=0.5, label="風速（m/s）"
+                minimum=0, maximum=20, value=3, step=0.5, label="風速（m/s）"
                 )
                 humidity = gr.Slider(
-                    minimum=0, maximum=100, value=50, step=5, label="湿度（%）"
+                minimum=0, maximum=100, value=50, step=5, label="湿度（%）"
                 )
 
             predict_button = gr.Button(
