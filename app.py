@@ -220,9 +220,8 @@ CSS = """
 
 def create_app():
     """Gradio の画面を組み立てて返す。"""
-    theme = gr.themes.Soft(primary_hue="sky")
-
-    with gr.Blocks(css=CSS, theme=theme, title="お出かけプランナー") as app:
+    with gr.Blocks(css=CSS, theme="soft", title="お出かけプランナー") as app:
+        
         # --- ヘッダー ---
         gr.Markdown("# ☀️ お出かけプランナー", elem_id="app-title")
         gr.Markdown(
