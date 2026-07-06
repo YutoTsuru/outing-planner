@@ -1,10 +1,13 @@
 ---
-gradio==4.44.0
-huggingface_hub==0.25.2
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-joblib>=1.3.0
+title: outing-planner
+emoji: ☀️
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: "5.0.0"
+python_version: "3.11"
+app_file: app.py
+pinned: false
 ---
 
 # ☀️ お出かけプランナー
