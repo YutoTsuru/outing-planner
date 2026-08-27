@@ -21,28 +21,21 @@ APIキーを書くか、環境変数 GOOGLE_MAPS_API_KEY に設定します。
 
 import gradio as gr
 
+import geocoding
 import maps_api
 import osm_api
 import planner
+import presentation
 from outing_ml.serve import OutingService
 
 # ---------------------------------------------------------------
 # 設定・固定データ
 # ---------------------------------------------------------------
 
-# カテゴリの (アイコン, 表示名)
-CATEGORY_LABELS = {
-    "outdoor": ("🌳", "屋外観光"),
-    "indoor": ("🏛️", "屋内観光"),
-    "relax": ("☕", "リラックス"),
-}
-
-# カテゴリごとのおすすめスポット例（Google Maps を使わないときの表示用）
-CATEGORY_SPOTS = {
-    "outdoor": ["公園", "神社", "海辺", "動物園"],
-    "indoor": ["水族館", "美術館", "博物館", "映画館"],
-    "relax": ["カフェ", "温泉", "図書館", "スパ"],
-}
+# カテゴリの表示名・スポット例・おすすめ理由は presentation.py に置いてある
+CATEGORY_LABELS = presentation.CATEGORY_LABELS
+CATEGORY_SPOTS = presentation.CATEGORY_SPOTS
+build_reason = presentation.build_reason
 
 # 場所の決め方（ラジオボタンの選択肢）
 LOCATION_MODE_GPS = "現在地から"
@@ -107,26 +100,6 @@ def load_service():
 
 # アプリ起動時に1回だけモデルを読み込む
 service = load_service()
-
-
-def build_reason(label, temperature, rain_probability, wind_speed, humidity):
-    """予測結果と入力値から、おすすめ理由の文章を作る（ルールベース）。"""
-    if label == "outdoor":
-        return "降水確率が低く、気温も過ごしやすいため、屋外観光に向いています。"
-
-    if label == "indoor":
-        if rain_probability >= 50:
-            return "雨の可能性が高いため、屋内で楽しめる場所がおすすめです。"
-        if wind_speed >= 10:
-            return "風が強いため、屋内で快適に過ごせる場所がおすすめです。"
-        return "外で過ごしにくい天気のため、屋内のスポットがおすすめです。"
-
-    # ここから下は relax の場合
-    if humidity >= 80:
-        return "湿度が高いので、ゆっくり過ごせる場所がおすすめです。"
-    if temperature < 10:
-        return "気温が低めなので、あたたかい場所でのんびり過ごすのがおすすめです。"
-    return "今日は無理せず、リラックスできる場所でゆっくり過ごすのがおすすめです。"
 
 
 def build_result_html(result, reason):
@@ -221,20 +194,13 @@ def resolve_location(mode, latitude_text, longitude_text, area_query):
     if not query:
         return None, None, None, "⚠️ 市区町村・都道府県を入力してください（例：京都市）。", None
 
-    # 1. Google Maps で地名を緯度経度に変換する
-    if maps_api.has_api_key() and maps_api.denied_reason() is None:
-        try:
-            latitude, longitude, area_name = maps_api.geocode(query)
-            return latitude, longitude, area_name, None, None
-        except maps_api.MapsError:
-            pass
-
-    # 2. だめなら OpenStreetMap で変換する
+    # Google Maps →（使えなければ）OpenStreetMap の順に試す
     try:
-        latitude, longitude, area_name = osm_api.geocode(query)
-        return latitude, longitude, area_name, None, None
-    except osm_api.OsmError as error:
-        return None, None, None, f"⚠️ その地名が見つかりませんでした（{error}）。", None
+        latitude, longitude, area_name = geocoding.resolve_area(query)
+    except geocoding.AreaNotFoundError as error:
+        return None, None, None, f"⚠️ {error}。", None
+
+    return latitude, longitude, area_name, None, None
 
 
 def make_plan(label, mode, latitude_text, longitude_text, area_query,

@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 google_maps_api_key.txt
+
+# 予測の記録（実行するとできる。中身は環境ごとに違う）
+reports/
