@@ -39,6 +39,7 @@
 
 - 学習データは**4つとも共通**です → [dataset.md](dataset.md)
 - まとめて作るなら `python train_all.py` の1コマンドで済みます
+- 作ったモデルの使い方（画面と REST API）は [webapp.md](webapp.md) にあります
 
 ---
 

@@ -39,6 +39,23 @@ Python授業用のサンプルとして、機械学習（scikit-learn）・Web�
 
 アプリが実際に使っているのは①です。②〜④は、①と同じデータから作った発展用のモデルです。
 
+### 4. 2つの画面と REST API
+
+同じモデルを、2つの入口から使えます。使い方は [doc/webapp.md](doc/webapp.md) にまとめています。
+
+| 入口 | 起動 | 特徴 |
+| --- | --- | --- |
+| Gradio（`app.py`） | `python app.py` → :7860 | 1ページで STEP 1→3。現在地の取得ができる。Hugging Face Spaces で動いているのはこちら |
+| Flask（`webapp.py`） | `python webapp.py` → :5000 | ページごとに分かれた画面 ＋ `/api` の REST API |
+
+REST API では、予測・まとめて予測・あしたの予報・プラン作成を JSON で扱えます。
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{"temperature": 22, "rain_probability": 10, "wind_speed": 2, "humidity": 50}'
+```
+
 ### 2. お出かけプランの作成
 
 予測のあと、場所と時間を指定すると、その時間内でまわれるタイムスケジュールを作ります。
@@ -111,6 +128,10 @@ Hugging Face Spaces で動かす場合は、Space の Settings → Variables and
 ```text
 outing-planner/
 ├─ app.py            # Gradioアプリ本体（UIと予測処理）
+├─ webapp.py         # Flaskアプリ本体（画面＋REST API）
+├─ api.py            # REST API（JSONで返す部分）
+├─ presentation.py   # 画面の文言（表示名・おすすめ理由・入力欄）
+├─ geocoding.py      # 地名→緯度経度（Google Maps → OpenStreetMap の順）
 ├─ maps_api.py       # Google Maps API との連携（地名→緯度経度、スポット検索）
 ├─ osm_api.py        # OpenStreetMap との連携（キー不要のスポット検索）
 ├─ planner.py        # お出かけプランの組み立て（時間割づくり、スポット割り当て）
@@ -124,8 +145,11 @@ outing-planner/
 ├─ README.md         # このファイル
 ├─ data/
 │  └─ weather_jp.csv    # 学習データ（9都市・6年ぶんの実測気象データ）
+├─ templates/        # Flaskアプリの画面（HTML）
+├─ static/           # Flaskアプリのスタイル（CSS）
 ├─ doc/
 │  ├─ README.md         # モデル一覧＋①のモデルカード
+│  ├─ webapp.md         # Webアプリと REST API の使い方
 │  ├─ dataset.md        # データセットの説明書
 │  ├─ forecast.md       # ② のモデルカード
 │  ├─ comfort.md        # ③ のモデルカード
@@ -193,13 +217,17 @@ APIキーは不要です（出典：Open-Meteo / ECMWF ERA5、CC BY 4.0）。
 
 ## アプリ起動方法
 
-モデルを作成したあと、アプリを起動します。
+モデルを作成したあと、好きなほうを起動します。
 
 ```bash
-python app.py
+python app.py       # Gradio版 → http://127.0.0.1:7860
+python webapp.py    # Flask版  → http://127.0.0.1:5000（REST API つき）
 ```
 
-起動すると、ターミナルにローカルURL（例：`http://127.0.0.1:7860`）が表示されるので、ブラウザで開いてください。
+起動するとターミナルにURLが表示されるので、ブラウザで開いてください。
+Flask版は `PORT=8000 python webapp.py` のようにポートを変えられます。
+起動できているかは `curl http://127.0.0.1:5000/api/health` で確かめられます。
+くわしい手順・API仕様・つまずいたときの対処は [doc/webapp.md](doc/webapp.md) にあります。
 
 ### まとめ（最初から動かす流れ）
 
@@ -207,7 +235,7 @@ python app.py
 pip install -r requirements.txt
 python fetch_weather.py
 python train_all.py
-python app.py
+python app.py        # または python webapp.py
 ```
 
 ## 今後の拡張について（メモ）

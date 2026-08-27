@@ -35,7 +35,7 @@ jobs:
           pip install pandas numpy scikit-learn joblib requests pytest ruff
 
       - name: lint（ruff）
-        run: ruff check outing_ml tests train_*.py fetch_weather.py
+        run: ruff check outing_ml tests scripts train_*.py fetch_weather.py app.py api.py webapp.py geocoding.py presentation.py
 
       - name: テスト
         run: pytest tests -q
