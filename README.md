@@ -20,7 +20,10 @@ Python授業用のサンプルとして、機械学習（scikit-learn）・Web�
 
 ### 1. おすすめカテゴリの予測
 
-気温・降水確率・風速・湿度の4つを入力すると、学習済みの機械学習モデル（ランダムフォレスト）がおすすめのお出かけカテゴリを予測します。予測結果と一緒に、おすすめ理由（ルールベースで生成）とおすすめスポット例も表示します。
+気温・降水確率・風速・湿度の4つを入力すると、学習済みの機械学習モデル（勾配ブースティング木）がおすすめのお出かけカテゴリを予測します。予測結果と一緒に、おすすめ理由（ルールベースで生成）とおすすめスポット例も表示します。
+
+モデルは、日本9都市・6年ぶん（19,728日）の実測気象データで学習しています。
+どんなモデルなのか・どこまで当たるのか・何が苦手なのかは [doc/README.md](doc/README.md) にまとめてあります。
 
 ### 2. お出かけプランの作成
 
@@ -86,7 +89,7 @@ Hugging Face Spaces で動かす場合は、Space の Settings → Variables and
 - Python 3.10 以上を推奨
 - Gradio（Web UI）
 - pandas / NumPy（データ処理）
-- scikit-learn（機械学習：RandomForestClassifier）
+- scikit-learn（機械学習：HistGradientBoostingClassifier）
 - joblib（モデルの保存・読み込み）
 
 ## ファイル構成
@@ -97,11 +100,18 @@ outing-planner/
 ├─ maps_api.py       # Google Maps API との連携（地名→緯度経度、スポット検索）
 ├─ osm_api.py        # OpenStreetMap との連携（キー不要のスポット検索）
 ├─ planner.py        # お出かけプランの組み立て（時間割づくり、スポット割り当て）
-├─ train_model.py    # モデル学習スクリプト（サンプルデータ作成→学習→保存）
+├─ fetch_weather.py  # 気象データの取得（Open-Meteo → data/weather_jp.csv）
+├─ train_model.py    # モデル学習スクリプト（ラベル付け→モデル選定→学習→保存）
 ├─ requirements.txt  # 必要なライブラリ一覧
 ├─ README.md         # このファイル
+├─ data/
+│  └─ weather_jp.csv    # 学習データ（9都市・6年ぶんの実測気象データ）
+├─ doc/
+│  ├─ README.md         # モデルカード（モデルの説明書）
+│  └─ dataset.md        # データセットの説明書
 └─ model/
-   └─ outing_model.pkl  # 学習済みモデル（train_model.py 実行で作成される）
+   ├─ outing_model.pkl  # 学習済みモデル（train_model.py 実行で作成される）
+   └─ model_card.json   # 成績や設定の記録（同上）
 ```
 
 ## セットアップ方法
@@ -116,14 +126,27 @@ pip install -r requirements.txt
 
 ## モデル学習方法
 
-サンプルデータの作成からモデルの学習・保存までを、次のコマンド1つで行います。
+学習データの用意からモデルの学習・保存までを、次の2つのコマンドで行います。
 
 ```bash
-python train_model.py
+python fetch_weather.py    # 気象データをダウンロード（初回のみ・数十秒）
+python train_model.py      # ラベル付け → モデル選定 → 学習 → 保存
 ```
 
-実行すると、`model/outing_model.pkl` に学習済みモデルが保存されます。
-学習データはスクリプト内で自動生成しているため、外部データセットの準備は不要です。
+`fetch_weather.py` は [Open-Meteo](https://open-meteo.com/) の過去データAPIから、
+日本9都市・6年ぶん（2019〜2024年）の実測気象データを取得して `data/weather_jp.csv` に保存します。
+APIキーは不要です（出典：Open-Meteo / ECMWF ERA5、CC BY 4.0）。
+
+`train_model.py` は、5つの候補（ベースライン・ロジスティック回帰・決定木・
+ランダムフォレスト・勾配ブースティング）を5分割交差検証で比べて、
+いちばん成績の良いモデルを選んで学習します。実行すると次の2つが保存されます。
+
+- `model/outing_model.pkl` … 学習済みモデル（アプリが読み込む）
+- `model/model_card.json` … 成績・設定・データの記録
+
+データが無いときは自動でダウンロードするため、`python train_model.py` だけでも動きます。
+成績や限界などのくわしい説明は [doc/README.md](doc/README.md)、
+学習データそのものの説明は [doc/dataset.md](doc/dataset.md) にあります。
 
 ※ 同梱の `outing_model.pkl` を使う場合でも、scikit-learn のバージョン違いによる警告を避けるため、最初に一度 `train_model.py` を実行し直すのがおすすめです。
 
@@ -141,6 +164,7 @@ python app.py
 
 ```bash
 pip install -r requirements.txt
+python fetch_weather.py
 python train_model.py
 python app.py
 ```
@@ -150,9 +174,11 @@ python app.py
 コードは関数ごとに分けてあるため、あとから機能を差し替えやすい構成です。
 
 - `predict_category()` … 天気APIから取得した実際の気象データを渡すように差し替え可能
+- `model.predict_proba()` … 予測の確率を取り出せるので、「おすすめ度○%」の表示にも使える
 - `build_reason()` … LLMによる理由生成に置き換え可能
 - `planner.STAY_MINUTES` / `TRAVEL_MINUTES` … 滞在時間・移動時間の目安を調整可能
 - `planner.KIND_KEYWORDS` … スポット検索のキーワードを増やすと、行き先のバリエーションが広がる
 - `maps_api.search_places()` … Directions API を足せば、実際の移動時間で組み立てることも可能
 
-※ 天気APIは使用していません（天気は手入力です）。
+※ アプリの天気は手入力です（天気予報APIは使っていません）。
+　 Open-Meteo を使うのは、モデルの学習データを取得するとき（`fetch_weather.py`）だけです。
