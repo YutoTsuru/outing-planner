@@ -1,0 +1,71 @@
+{# 予測結果のカード。天気から予測したときと、あしたの予報から予測したときの両方で使う。 #}
+<div class="card">
+  <div class="result-head">
+    <div class="result-emoji">{{ label.emoji }}</div>
+    <div>
+      <span class="result-caption">{{ caption }}</span>
+      <span class="result-name">{{ label.name }}</span>
+    </div>
+  </div>
+
+  <p class="reason">{{ reason }}</p>
+
+  {% if result.warnings %}
+  <div class="warn">
+    <ul>{% for text in result.warnings %}<li>{{ text }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="metrics">
+    <div class="metric"><span class="k">AIの確信度</span><span class="v">{{ (result.confidence * 100) | round | int }}%</span></div>
+    {% if result.comfort_score is not none %}
+    <div class="metric"><span class="k">おでかけ日和度</span><span class="v">{{ result.comfort_score | round | int }}点</span></div>
+    {% endif %}
+    {% if result.weather_type_name %}
+    <div class="metric"><span class="k">今日の天気タイプ</span><span class="v">{{ result.weather_type_name }}</span></div>
+    {% endif %}
+  </div>
+
+  <h3>カテゴリごとの確率</h3>
+  <div class="bars">
+    {% for name, value in probabilities %}
+    <div class="bar-row">
+      <span>{{ labels[name].name }}</span>
+      <span class="bar"><span style="width: {{ (value * 100) | round(1) }}%"></span></span>
+      <span class="num">{{ (value * 100) | round(1) }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h3>こんな場所がおすすめ</h3>
+  <div class="chips">
+    {% for spot in label.spots %}<span class="chip">{{ spot }}</span>{% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>この日のプランを作る</h2>
+  <p class="lead">場所と時間を決めると、実在するスポットを探して時間割にします（10秒ほどかかることがあります）。</p>
+  <form method="post" action="{{ url_for('web.plan_page') }}">
+    <input type="hidden" name="category" value="{{ result.category }}">
+    <div class="fields">
+      <div>
+        <label for="area">場所<span class="hint">市区町村・都道府県</span></label>
+        <input type="text" id="area" name="area" value="{{ area or '京都市' }}" required>
+      </div>
+      <div>
+        <label for="start_time">開始</label>
+        <input type="time" id="start_time" name="start_time" value="10:00" step="1800" required>
+      </div>
+      <div>
+        <label for="end_time">終了</label>
+        <input type="time" id="end_time" name="end_time" value="17:00" step="1800" required>
+      </div>
+      <div>
+        <label for="radius_km">探す範囲<span class="hint">1 〜 20 km</span></label>
+        <input type="number" id="radius_km" name="radius_km" value="3" min="1" max="20" step="1" required>
+      </div>
+    </div>
+    <button type="submit">プランを作る</button>
+  </form>
+</div>

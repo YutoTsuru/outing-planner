@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}お出かけプランナー{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <h1><a href="{{ url_for('web.index') }}">☀️ お出かけプランナー</a></h1>
+    <nav>
+      <a href="{{ url_for('web.index') }}">天気から</a>
+      <a href="{{ url_for('web.forecast_page') }}">あしたの予報</a>
+      <a href="{{ url_for('web.models_page') }}">モデルの状態</a>
+    </nav>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer class="site">
+    予測は機械学習モデルによるものです。授業用の教材のため、実際の外出の可否判断には使わないでください。<br>
+    気象データ出典：Open-Meteo（ECMWF ERA5）, CC BY 4.0 ／ REST API は <code>/api/health</code> から。
+  </footer>
+</div>
+</body>
+</html>
