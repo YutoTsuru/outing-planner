@@ -1,0 +1,146 @@
+{
+  "model_name": "outing-planner-weather-types",
+  "created_at": "2026-08-27",
+  "task": "天気を似たものどうしにまとめる（教師なし学習・k-means）",
+  "estimator": "Pipeline(StandardScaler, KMeans)",
+  "features": [
+    "temperature",
+    "rain_probability",
+    "wind_speed",
+    "humidity"
+  ],
+  "n_clusters": 4,
+  "selection": [
+    {
+      "タイプ数": 3,
+      "シルエット係数": 0.259640140222722,
+      "まとまりの悪さ": 42788.73922928441
+    },
+    {
+      "タイプ数": 4,
+      "シルエット係数": 0.2661945671184806,
+      "まとまりの悪さ": 35991.404671283184
+    },
+    {
+      "タイプ数": 5,
+      "シルエット係数": 0.26254248963227805,
+      "まとまりの悪さ": 31863.914395287524
+    },
+    {
+      "タイプ数": 6,
+      "シルエット係数": 0.2624311929286012,
+      "まとまりの悪さ": 28734.964299478088
+    },
+    {
+      "タイプ数": 7,
+      "シルエット係数": 0.25356460692039856,
+      "まとまりの悪さ": 26298.770960621558
+    },
+    {
+      "タイプ数": 8,
+      "シルエット係数": 0.24779310109679917,
+      "まとまりの悪さ": 24197.466903266344
+    }
+  ],
+  "silhouette": 0.2661945671184806,
+  "clusters": [
+    {
+      "id": 3,
+      "name": "過ごしやすい晴れの日",
+      "count": 6418,
+      "share": 0.32532441200324413,
+      "center": {
+        "temperature": 25.2,
+        "rain_probability": 10.0,
+        "wind_speed": 3.3,
+        "humidity": 65.8
+      },
+      "examples": [
+        "大阪 2024-06-26",
+        "仙台 2022-06-17",
+        "大阪 2021-09-25"
+      ],
+      "category_share": {
+        "outdoor": 0.675,
+        "indoor": 0.191,
+        "relax": 0.133
+      }
+    },
+    {
+      "id": 0,
+      "name": "肌寒い晴れの日",
+      "count": 5608,
+      "share": 0.2842660178426602,
+      "center": {
+        "temperature": 10.0,
+        "rain_probability": 6.1,
+        "wind_speed": 3.0,
+        "humidity": 59.2
+      },
+      "examples": [
+        "東京 2022-03-21",
+        "大阪 2023-03-04",
+        "新潟 2023-12-05"
+      ],
+      "category_share": {
+        "relax": 0.591,
+        "outdoor": 0.339,
+        "indoor": 0.07
+      }
+    },
+    {
+      "id": 1,
+      "name": "過ごしやすい雨の日（じめじめ）",
+      "count": 4719,
+      "share": 0.23920316301703162,
+      "center": {
+        "temperature": 20.6,
+        "rain_probability": 76.6,
+        "wind_speed": 4.0,
+        "humidity": 82.2
+      },
+      "examples": [
+        "札幌 2019-08-28",
+        "那覇 2020-04-04",
+        "新潟 2021-05-16"
+      ],
+      "category_share": {
+        "indoor": 0.983,
+        "relax": 0.015,
+        "outdoor": 0.001
+      }
+    },
+    {
+      "id": 2,
+      "name": "肌寒いくもりがちの日（風が強い）",
+      "count": 2983,
+      "share": 0.15120640713706407,
+      "center": {
+        "temperature": 13.1,
+        "rain_probability": 17.7,
+        "wind_speed": 7.3,
+        "humidity": 58.9
+      },
+      "examples": [
+        "那覇 2023-01-28",
+        "名古屋 2021-05-02",
+        "大阪 2020-04-02"
+      ],
+      "category_share": {
+        "relax": 0.375,
+        "indoor": 0.369,
+        "outdoor": 0.256
+      }
+    }
+  ],
+  "dataset": {
+    "path": "data/weather_jp.csv",
+    "rows": 19728
+  },
+  "environment": {
+    "python": "3.13.14",
+    "scikit_learn": "1.9.0",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5"
+  }
+}
