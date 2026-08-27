@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ city }}のあしたの予報 ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>{{ city }}｜{{ forecast.target_date }} の予報</h2>
+  <p class="lead">{{ forecast.base_date }} までの実測から予測しました。</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>項目</th><th class="num">予測</th><th class="num">だいたいこの範囲（80%）</th></tr></thead>
+      <tbody>
+        {% for field in fields %}
+        <tr>
+          <td>{{ field.label }}</td>
+          <td class="num">{{ forecast.weather[field.name] }}{{ field.unit }}</td>
+          <td class="num">
+            {% set span = forecast.interval.get(field.name) %}
+            {% if span %}{{ span.low }} 〜 {{ span.high }}{{ field.unit }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if forecast.notes %}
+  <div class="warn" style="margin-top:18px">
+    <ul>{% for note in forecast.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+
+{% include "_result.html" %}
+
+{% endblock %}

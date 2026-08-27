@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}モデルの状態 ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>読み込めているモデル</h2>
+  <p class="lead">いま画面が使っているモデルの版です。</p>
+  <div class="metrics">
+    {% for key, value in health.models.items() %}
+    <div class="metric"><span class="k">{{ key }}</span><span class="v">{{ value or '未読込' }}</span></div>
+    {% endfor %}
+  </div>
+  <h3>学習に使ったデータ</h3>
+  <p class="lead" style="margin:0">
+    指紋（sha256）<code>{{ health.data_sha256[:16] if health.data_sha256 else '不明' }}…</code>
+    ／ 学習日時 {{ health.trained_at or '不明' }}
+  </p>
+</div>
+
+<div class="card">
+  <h2>学習の履歴</h2>
+  <p class="lead">どのデータで・いつ・どの版を作ったかの記録です（model/registry.json）。</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>モデル</th><th>版</th><th>やること</th><th>おもな成績</th><th>作成</th></tr></thead>
+      <tbody>
+        {% for entry in models %}
+        <tr>
+          <td><code>{{ entry.model_name }}</code></td>
+          <td>{{ entry.version }}</td>
+          <td>{{ entry.task }}</td>
+          <td>
+            {% for key, value in entry.headline %}
+            {{ key }} <strong>{{ value }}</strong>{% if not loop.last %} ／ {% endif %}
+            {% endfor %}
+          </td>
+          <td>{{ entry.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>天気のタイプ</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>#</th><th>名前</th><th class="num">気温</th><th class="num">降水確率</th><th class="num">風速</th><th class="num">湿度</th><th class="num">割合</th></tr></thead>
+      <tbody>
+        {% for item in weather_types %}
+        <tr>
+          <td>{{ item.id }}</td>
+          <td>{{ item.name }}</td>
+          <td class="num">{{ item.center.temperature }}℃</td>
+          <td class="num">{{ item.center.rain_probability }}%</td>
+          <td class="num">{{ item.center.wind_speed }}m/s</td>
+          <td class="num">{{ item.center.humidity }}%</td>
+          <td class="num">{{ (item.share * 100) | round(1) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}天気から探す ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>今日の天気を入れる</h2>
+  <p class="lead">4つの数値から、おすすめのお出かけ先のタイプ・おでかけ日和度・天気のタイプを予測します。</p>
+
+  <form method="post" action="{{ url_for('web.predict_page') }}">
+    <div class="fields">
+      {% for field in fields %}
+      <div>
+        <label for="{{ field.name }}">
+          {{ field.label }}
+          <span class="hint">{{ field.min }} 〜 {{ field.max }}{{ field.unit }}</span>
+        </label>
+        <input type="number" id="{{ field.name }}" name="{{ field.name }}"
+               value="{{ field.value }}" min="{{ field.min }}" max="{{ field.max }}"
+               step="{{ field.step }}" required>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="submit">おすすめを予測する</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>天気が分からないとき</h2>
+  <p class="lead">都市を選ぶと、直近の実測から「あしたの天気」を予測して、そのままおすすめまで出します。</p>
+  <form method="get" action="{{ url_for('web.forecast_page') }}">
+    <div class="fields">
+      <div>
+        <label for="city">都市</label>
+        <select id="city" name="city">
+          {% for name in cities %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit">あしたの予報から探す</button>
+  </form>
+</div>
+
+{% endblock %}

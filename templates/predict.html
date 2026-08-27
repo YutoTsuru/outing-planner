@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ label.name }} ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>入れた天気</h2>
+  <div class="metrics">
+    {% for field in fields %}
+    <div class="metric"><span class="k">{{ field.label }}</span><span class="v">{{ weather[field.name] }}{{ field.unit }}</span></div>
+    {% endfor %}
+  </div>
+</div>
+
+{% include "_result.html" %}
+
+{% endblock %}
