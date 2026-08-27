@@ -8,7 +8,7 @@
   4. 確率の質  … 「80%」と言ったとき、本当に8割当たっているか（較正）
 """
 
-from typing import Callable, Dict, List, Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,7 +25,6 @@ from sklearn.metrics import (
 
 from outing_ml.config import CONFIG
 
-
 # ---------------------------------------------------------------
 # 信頼区間
 # ---------------------------------------------------------------
@@ -37,7 +36,7 @@ def bootstrap_interval(
     n_samples: int = None,
     seed: int = None,
     alpha: float = 0.05,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """ブートストラップ法で、指標の95%信頼区間を出す。
 
     評価用データから重複ありで選び直したものを何度も作り、
@@ -72,8 +71,8 @@ def bootstrap_interval(
 # ---------------------------------------------------------------
 
 def classification_metrics(
-    y_true: Sequence, y_pred: Sequence, proba: np.ndarray = None, classes: List[str] = None
-) -> Dict[str, object]:
+    y_true: Sequence, y_pred: Sequence, proba: np.ndarray = None, classes: list[str] = None
+) -> dict[str, object]:
     """正解率・マクロF1（信頼区間つき）・対数損失・混同行列をまとめて返す。"""
     result = {
         "accuracy": bootstrap_interval(accuracy_score, y_true, y_pred),
@@ -94,8 +93,8 @@ def classification_metrics(
 
 
 def expected_calibration_error(
-    y_true: Sequence, proba: np.ndarray, classes: List[str], bins: int = None
-) -> Dict[str, object]:
+    y_true: Sequence, proba: np.ndarray, classes: list[str], bins: int = None
+) -> dict[str, object]:
     """確率がどれくらい正直かを測る（ECE）。
 
     「85%の自信がある」と言った予測を集めたとき、
@@ -113,7 +112,7 @@ def expected_calibration_error(
     table = []
     error = 0.0
 
-    for start, end in zip(edges[:-1], edges[1:]):
+    for start, end in zip(edges[:-1], edges[1:], strict=True):
         in_bin = (confidence > start) & (confidence <= end)
         count = int(in_bin.sum())
         if count == 0:
@@ -135,7 +134,7 @@ def expected_calibration_error(
     return {"ece": float(error), "bins": table}
 
 
-def mcnemar_test(y_true: Sequence, pred_a: Sequence, pred_b: Sequence) -> Dict[str, object]:
+def mcnemar_test(y_true: Sequence, pred_a: Sequence, pred_b: Sequence) -> dict[str, object]:
     """2つのモデルの差が、誤差の範囲かどうかを調べる（マクネマー検定）。
 
     「Aのほうが正解率が1%高い」だけでは、たまたまかもしれません。
@@ -167,7 +166,7 @@ def mcnemar_test(y_true: Sequence, pred_a: Sequence, pred_b: Sequence) -> Dict[s
 
 def slice_report(
     frame: pd.DataFrame, y_true: Sequence, y_pred: Sequence, by: str, min_count: int = 30
-) -> List[Dict[str, object]]:
+) -> list[dict[str, object]]:
     """都市別・季節別など、グループごとの成績を出す。
 
     全体の平均が良くても、特定の都市や季節だけ極端に悪いことがあります。
@@ -204,7 +203,7 @@ def season_of(dates: Sequence) -> np.ndarray:
 # 回帰の評価
 # ---------------------------------------------------------------
 
-def regression_metrics(y_true: Sequence, y_pred: Sequence, with_interval: bool = True) -> Dict:
+def regression_metrics(y_true: Sequence, y_pred: Sequence, with_interval: bool = True) -> dict:
     """MAE・RMSE・R2 を返す（MAE には信頼区間をつける）。"""
     result = {
         "mae": float(mean_absolute_error(y_true, y_pred)),

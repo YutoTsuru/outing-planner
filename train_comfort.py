@@ -14,7 +14,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -246,13 +246,13 @@ def main():
     examples = [(22, 10, 2, 50), (15, 80, 4, 70), (33, 0, 2, 85), (5, 0, 8, 40)]
     predicted = final_model.predict(pd.DataFrame(examples, columns=FEATURE_COLUMNS))
     print("\n   予測の例:")
-    for values, score in zip(examples, predicted):
+    for values, score in zip(examples, predicted, strict=True):
         print(f"   気温{values[0]:>4}℃ 降水{values[1]:>4}% 風速{values[2]:>3}m/s "
               f"湿度{values[3]:>3}% → {score:5.1f} 点")
 
     card = {
         "model_name": MODEL_NAME,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "task": "おでかけ日和度（0〜100点）を当てる回帰",
         "selected_model": best_name,
         "estimator": type(final_model).__name__,
@@ -275,8 +275,8 @@ def main():
         "test_metrics": test_metrics,
         "holdout_metrics": holdout,
         "examples": [
-            {"input": dict(zip(FEATURE_COLUMNS, values)), "score": float(score)}
-            for values, score in zip(examples, predicted)
+            {"input": dict(zip(FEATURE_COLUMNS, values, strict=True)), "score": float(score)}
+            for values, score in zip(examples, predicted, strict=True)
         ],
     }
 

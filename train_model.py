@@ -22,9 +22,8 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.dummy import DummyClassifier
@@ -365,7 +364,7 @@ def main():
 
     card = {
         "model_name": MODEL_NAME,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "task": "天気からお出かけカテゴリを当てる3クラス分類",
         "selected_model": best_name,
         "runner_up": runner_up_name,

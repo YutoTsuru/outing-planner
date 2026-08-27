@@ -1,0 +1,19 @@
+# Python の開発ツール設定。
+# アプリの依存は requirements.txt、開発用は requirements-dev.txt を見てください。
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["model", "data", "reports"]
+
+[tool.ruff.lint]
+# E: pycodestyle / F: pyflakes / I: import順 / B: bugbear / UP: 新しい書き方
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "E501",  # 行の長さは formatter に任せる（日本語コメントで桁数が合わないため）
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 日本語のテスト名をそのまま表示する
+addopts = "-v --tb=short"

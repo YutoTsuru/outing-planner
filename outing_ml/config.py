@@ -6,14 +6,13 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
 
 # ---------------------------------------------------------------
 # 列と分類ラベル（学習・推論・監視で共通）
 # ---------------------------------------------------------------
 
 # 特徴量の順番。この順番はモデルの成果物にも保存され、推論時に検証される
-FEATURE_COLUMNS: List[str] = [
+FEATURE_COLUMNS: list[str] = [
     "temperature",
     "rain_probability",
     "wind_speed",
@@ -21,10 +20,10 @@ FEATURE_COLUMNS: List[str] = [
 ]
 
 # 予測するカテゴリ（確率の並び順もこの通り）
-CATEGORIES: List[str] = ["indoor", "outdoor", "relax"]
+CATEGORIES: list[str] = ["indoor", "outdoor", "relax"]
 
 # アプリで入力できる範囲（＝推論時に受け付ける範囲）
-INPUT_RANGES: Dict[str, Tuple[float, float]] = {
+INPUT_RANGES: dict[str, tuple[float, float]] = {
     "temperature": (-10.0, 40.0),
     "rain_probability": (0.0, 100.0),
     "wind_speed": (0.0, 20.0),
@@ -67,7 +66,7 @@ class Paths:
 @dataclass(frozen=True)
 class DataSpec:
     # (都市名, 緯度, 経度)
-    cities: Tuple[Tuple[str, float, float], ...] = (
+    cities: tuple[tuple[str, float, float], ...] = (
         ("札幌", 43.0621, 141.3544),
         ("仙台", 38.2682, 140.8694),
         ("新潟", 37.9161, 139.0364),
@@ -85,7 +84,7 @@ class DataSpec:
     holdout_lag_days: int = 7
 
     # お出かけする時間帯（9時〜18時の10時間）
-    outing_hours: Tuple[int, ...] = tuple(range(9, 19))
+    outing_hours: tuple[int, ...] = tuple(range(9, 19))
     # 「雨が降っている」とみなす1時間あたりの雨量（mm）
     rain_threshold_mm: float = 0.1
     request_interval_sec: float = 1.0
@@ -165,12 +164,12 @@ class TrainSpec:
 
 @dataclass(frozen=True)
 class ForecastSpec:
-    lag_days: Tuple[int, ...] = (1, 2)
+    lag_days: tuple[int, ...] = (1, 2)
     rolling_window: int = 3
     # ウォークフォワード検証の分割（学習の終わり, 評価する年）
-    backtest_years: Tuple[int, ...] = (2021, 2022, 2023, 2024)
+    backtest_years: tuple[int, ...] = (2021, 2022, 2023, 2024)
     # 予測区間の分位点
-    quantiles: Tuple[float, ...] = (0.1, 0.5, 0.9)
+    quantiles: tuple[float, ...] = (0.1, 0.5, 0.9)
 
 
 @dataclass(frozen=True)

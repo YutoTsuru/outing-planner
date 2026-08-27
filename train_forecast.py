@@ -20,11 +20,10 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
-from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -221,7 +220,7 @@ def fit_quantile_models(train, input_columns, target_names):
     """項目ごと・分位点ごとにモデルを学習する。"""
     models = {}
 
-    for column, target in zip(TARGET_COLUMNS, target_names):
+    for column, target in zip(TARGET_COLUMNS, target_names, strict=True):
         models[column] = {}
         for quantile in CONFIG.forecast.quantiles:
             model = build_quantile_model(input_columns, quantile)
@@ -239,7 +238,7 @@ def evaluate_intervals(models, test, input_columns, target_names):
 
     report = {"nominal_coverage": float(nominal), "targets": {}}
 
-    for column, target in zip(TARGET_COLUMNS, target_names):
+    for column, target in zip(TARGET_COLUMNS, target_names, strict=True):
         actual = test[target].to_numpy(dtype=float)
         lower = models[column][low_quantile].predict(test[input_columns])
         upper = models[column][high_quantile].predict(test[input_columns])
@@ -386,7 +385,7 @@ def main():
     print("\n7. 保存します...")
     card = {
         "model_name": MODEL_NAME,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "task": "翌日の気象4項目を当てる多出力回帰（予測区間つき）",
         "estimator": "MultiOutputRegressor(HistGradientBoostingRegressor)",
         "targets": TARGET_COLUMNS,

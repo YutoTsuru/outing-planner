@@ -18,8 +18,7 @@ import os
 import platform
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 import joblib
 
@@ -29,7 +28,7 @@ from outing_ml.config import CONFIG
 BUNDLE_FORMAT = 2
 
 
-def git_sha(short: bool = True) -> Optional[str]:
+def git_sha(short: bool = True) -> str | None:
     """いまのコミットのハッシュを返す（git が無い環境では None）。"""
     command = ["git", "rev-parse", "--short" if short else "HEAD", "HEAD"]
     try:
@@ -42,7 +41,7 @@ def git_sha(short: bool = True) -> Optional[str]:
         return None
 
 
-def git_is_dirty() -> Optional[bool]:
+def git_is_dirty() -> bool | None:
     """コミットしていない変更があるかどうか。
 
     「実験のときのコードが残っていないモデル」を防ぐための印です。
@@ -57,7 +56,7 @@ def git_is_dirty() -> Optional[bool]:
         return None
 
 
-def environment_info() -> Dict[str, str]:
+def environment_info() -> dict[str, str]:
     """学習したときのライブラリのバージョンを記録する。"""
     import numpy
     import pandas
@@ -78,20 +77,20 @@ class ModelBundle:
     """モデル本体と、それを正しく使うために必要な情報のセット。"""
 
     estimator: object
-    feature_names: List[str]
+    feature_names: list[str]
     model_name: str
     version: str
     task: str
-    classes: Optional[List[str]] = None
-    target: Optional[str] = None
-    metadata: Dict[str, object] = field(default_factory=dict)
+    classes: list[str] | None = None
+    target: str | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
     format_version: int = BUNDLE_FORMAT
 
     def predict_frame(self, frame):
         """特徴量の順番をそろえてから予測する。"""
         return self.estimator.predict(frame[self.feature_names])
 
-    def check_features(self, columns: List[str]) -> None:
+    def check_features(self, columns: list[str]) -> None:
         """渡された列が、学習時と同じ名前・同じ順番かを確かめる。"""
         if list(columns) != list(self.feature_names):
             raise ValueError(
@@ -150,7 +149,7 @@ class Registry:
     def __init__(self, path: str = None):
         self.path = path or CONFIG.paths.registry
 
-    def _read(self) -> List[Dict]:
+    def _read(self) -> list[dict]:
         if not os.path.exists(self.path):
             return []
         with open(self.path, encoding="utf-8") as file:
@@ -161,10 +160,10 @@ class Registry:
         model_name: str,
         artifact_path: str,
         task: str,
-        metrics: Dict,
-        data_fingerprint: Dict,
-        params: Dict = None,
-    ) -> Dict:
+        metrics: dict,
+        data_fingerprint: dict,
+        params: dict = None,
+    ) -> dict:
         """1回ぶんの学習を記録して、その中身を返す。"""
         entries = self._read()
         previous = [entry for entry in entries if entry["model_name"] == model_name]
@@ -175,7 +174,7 @@ class Registry:
             "version": version,
             "artifact": artifact_path,
             "task": task,
-            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "git_sha": git_sha(),
             "git_dirty": git_is_dirty(),
             "data": data_fingerprint,
@@ -191,13 +190,13 @@ class Registry:
 
         return entry
 
-    def latest(self, model_name: str) -> Optional[Dict]:
+    def latest(self, model_name: str) -> dict | None:
         """そのモデルの最新の記録を返す。"""
         for entry in self._read():
             if entry["model_name"] == model_name:
                 return entry
         return None
 
-    def history(self, model_name: str) -> List[Dict]:
+    def history(self, model_name: str) -> list[dict]:
         """そのモデルの記録を新しい順に返す。"""
         return [entry for entry in self._read() if entry["model_name"] == model_name]

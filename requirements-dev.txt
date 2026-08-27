@@ -1,0 +1,5 @@
+# 開発・CI 用。アプリの実行には requirements.txt だけで足ります。
+-r requirements.txt
+
+pytest>=8.0.0
+ruff>=0.6.0

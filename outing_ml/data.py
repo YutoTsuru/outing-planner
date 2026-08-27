@@ -8,7 +8,6 @@
 import hashlib
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -25,14 +24,14 @@ class ColumnSpec:
 
     name: str
     kind: str                      # "number" / "text" / "date"
-    minimum: Optional[float] = None
-    maximum: Optional[float] = None
+    minimum: float | None = None
+    maximum: float | None = None
     required: bool = True
 
 
 # 学習データ（data/weather_jp.csv）の約束
 # 範囲は「物理的にありえる値」で、アプリの入力範囲より広く取っている
-DATASET_SCHEMA: List[ColumnSpec] = [
+DATASET_SCHEMA: list[ColumnSpec] = [
     ColumnSpec("city", "text"),
     ColumnSpec("date", "date"),
     ColumnSpec("temperature", "number", minimum=-40.0, maximum=50.0),
@@ -47,9 +46,9 @@ class ValidationReport:
     """検証の結果。errors が空でなければ、そのデータは使えない。"""
 
     rows: int = 0
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    stats: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -63,7 +62,7 @@ class ValidationReport:
         return self
 
 
-def validate_frame(df: pd.DataFrame, schema: List[ColumnSpec] = None) -> ValidationReport:
+def validate_frame(df: pd.DataFrame, schema: list[ColumnSpec] = None) -> ValidationReport:
     """DataFrame がスキーマを満たしているか調べる。
 
     調べること:
@@ -142,7 +141,7 @@ def validate_frame(df: pd.DataFrame, schema: List[ColumnSpec] = None) -> Validat
     return report
 
 
-def _find_date_gaps(df: pd.DataFrame) -> List[str]:
+def _find_date_gaps(df: pd.DataFrame) -> list[str]:
     """都市ごとに、日付が1日ずつ連続しているかを調べる。"""
     gaps = []
     frame = df[["city", "date"]].copy()
@@ -186,7 +185,7 @@ def file_sha256(path: str) -> str:
     return digest.hexdigest()
 
 
-def dataset_fingerprint(path: str = None) -> Dict[str, object]:
+def dataset_fingerprint(path: str = None) -> dict[str, object]:
     """学習データの指紋（ハッシュ・行数・期間）をまとめて返す。"""
     path = path or CONFIG.paths.dataset
     df = pd.read_csv(path)
