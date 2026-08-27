@@ -22,109 +22,26 @@ APIキーは不要で、非商用利用は無料です（出典：Open-Meteo / E
 
 import argparse
 import os
-import time
 from datetime import date, timedelta
-
-import pandas as pd
-import requests
 
 from outing_ml.config import CONFIG
 from outing_ml.data import validate_frame
-
-# 取得先（Open-Meteo の過去データ用エンドポイント。APIキー不要）
-ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+from outing_ml.weather_source import download_range
 
 DATA_DIR = CONFIG.paths.data_dir
 DATA_PATH = CONFIG.paths.dataset
 HOLDOUT_PATH = CONFIG.paths.holdout
 
 
-def fetch_city_hourly(name, latitude, longitude, start_date, end_date):
-    """1都市ぶんの「1時間ごとの気象データ」を取得して DataFrame で返す。"""
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "start_date": start_date,
-        "end_date": end_date,
-        "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation",
-        "wind_speed_unit": "ms",       # 風速の単位を m/s にそろえる（既定は km/h）
-        "timezone": "Asia/Tokyo",      # 日本時間で日付を区切る
-    }
-
-    response = requests.get(ARCHIVE_URL, params=params,
-                            timeout=CONFIG.data.request_timeout_sec)
-    response.raise_for_status()
-    hourly = response.json()["hourly"]
-
-    df = pd.DataFrame(
-        {
-            "time": pd.to_datetime(hourly["time"]),
-            "temperature": hourly["temperature_2m"],
-            "humidity": hourly["relative_humidity_2m"],
-            "wind_speed": hourly["wind_speed_10m"],
-            "precipitation": hourly["precipitation"],
-        }
-    )
-    df["city"] = name
-    return df
-
-
-def summarize_by_day(df):
-    """1時間ごとのデータを、1日1行のデータにまとめる。"""
-    hours = list(CONFIG.data.outing_hours)
-    df = df[df["time"].dt.hour.isin(hours)].copy()
-
-    df["date"] = df["time"].dt.date
-    df["is_rainy_hour"] = (
-        df["precipitation"] >= CONFIG.data.rain_threshold_mm
-    ).astype(float)
-
-    grouped = df.groupby(["city", "date"]).agg(
-        temperature=("temperature", "mean"),
-        humidity=("humidity", "mean"),
-        wind_speed=("wind_speed", "mean"),
-        rain_hours=("is_rainy_hour", "sum"),
-        hours=("time", "count"),
-        missing=("temperature", lambda values: values.isna().sum()),
-    )
-
-    # 10時間そろっていない日・欠測がある日は使わない
-    grouped = grouped[(grouped["hours"] == len(hours)) & (grouped["missing"] == 0)]
-
-    # 「10時間のうち何時間 雨だったか」を割合（%）にして、降水確率のかわりに使う
-    grouped["rain_probability"] = grouped["rain_hours"] / len(hours) * 100
-
-    result = grouped.reset_index()[
-        ["city", "date", "temperature", "rain_probability", "wind_speed", "humidity"]
-    ]
-    result["temperature"] = result["temperature"].round(1)
-    result["rain_probability"] = result["rain_probability"].round(0).astype(int)
-    result["wind_speed"] = result["wind_speed"].round(1)
-    result["humidity"] = result["humidity"].round(0).astype(int)
-    return result
-
-
-def download_range(start_date, end_date):
-    """全都市ぶんを取得して、1つの DataFrame にまとめる。"""
-    frames = []
-    cities = CONFIG.data.cities
-
-    for index, (name, latitude, longitude) in enumerate(cities, start=1):
-        print(f"  [{index}/{len(cities)}] {name} を取得中...", flush=True)
-        hourly = fetch_city_hourly(name, latitude, longitude, start_date, end_date)
-        daily = summarize_by_day(hourly)
-        print(f"      {len(daily)} 日ぶん")
-        frames.append(daily)
-
-        if index < len(cities):
-            time.sleep(CONFIG.data.request_interval_sec)
-
-    return pd.concat(frames, ignore_index=True).sort_values(["city", "date"])
+def report_progress(index, total, name):
+    """取得の進み具合を表示する。"""
+    print(f"  [{index}/{total}] {name} を取得中...", flush=True)
 
 
 def download_all():
     """学習データの期間を取得する（train_model.py から呼ばれる）。"""
-    return download_range(CONFIG.data.start_date, CONFIG.data.end_date)
+    return download_range(CONFIG.data.start_date, CONFIG.data.end_date,
+                          progress=report_progress)
 
 
 def holdout_end_date():
@@ -159,7 +76,7 @@ def build(path, start_date, end_date, label, force):
         return
 
     print(f"\n{label}を取得します（{start_date} 〜 {end_date}）")
-    save(download_range(start_date, end_date), path)
+    save(download_range(start_date, end_date, progress=report_progress), path)
 
 
 def main():
