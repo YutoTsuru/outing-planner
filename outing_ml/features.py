@@ -9,7 +9,6 @@
 と決め、テスト（tests/test_features.py）でも守られていることを確かめています。
 """
 
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -56,7 +55,7 @@ def build_supervised_frame(raw: pd.DataFrame, spec=None) -> pd.DataFrame:
     return features.dropna().reset_index(drop=True)
 
 
-def input_columns(features: pd.DataFrame) -> List[str]:
+def input_columns(features: pd.DataFrame) -> list[str]:
     """入力に使う列の名前（正解の列と日付をのぞいたもの）。"""
     return [
         column
@@ -65,12 +64,12 @@ def input_columns(features: pd.DataFrame) -> List[str]:
     ]
 
 
-def target_columns() -> List[str]:
+def target_columns() -> list[str]:
     """正解の列の名前。"""
     return [f"{column}{TARGET_SUFFIX}" for column in FEATURE_COLUMNS]
 
 
-def split_by_year(features: pd.DataFrame, test_year: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def split_by_year(features: pd.DataFrame, test_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     """指定した年より前を学習用、その年以降を評価用に分ける。"""
     is_test = features["date"].dt.year >= test_year
     return (

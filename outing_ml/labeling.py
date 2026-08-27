@@ -10,7 +10,6 @@
 実データ（施設の入場者数やアンケート）が手に入ったら、真っ先に置き換えるべき部分です。
 """
 
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -161,7 +160,7 @@ def add_comfort_scores(df: pd.DataFrame, seed: int = None) -> pd.DataFrame:
     return result
 
 
-def label_distribution(df: pd.DataFrame) -> Dict[str, int]:
+def label_distribution(df: pd.DataFrame) -> dict[str, int]:
     """ラベルの件数を数える（カテゴリの並び順を固定して返す）。"""
     counts = df["label"].value_counts()
     return {name: int(counts.get(name, 0)) for name in CATEGORIES}

@@ -11,7 +11,6 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -29,15 +28,15 @@ class Recommendation:
     """1日ぶんの予測結果。"""
 
     category: str
-    probabilities: Dict[str, float]
+    probabilities: dict[str, float]
     confidence: float
-    comfort_score: Optional[float] = None
-    weather_type: Optional[int] = None
-    weather_type_name: Optional[str] = None
-    warnings: List[str] = field(default_factory=list)
-    model_versions: Dict[str, str] = field(default_factory=dict)
+    comfort_score: float | None = None
+    weather_type: int | None = None
+    weather_type_name: str | None = None
+    warnings: list[str] = field(default_factory=list)
+    model_versions: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "category": self.category,
             "probabilities": self.probabilities,
@@ -54,8 +53,10 @@ def _as_number(name: str, value) -> float:
     """入力を数値に直す。数値にできなければ、その場で止める。"""
     try:
         number = float(value)
-    except (TypeError, ValueError):
-        raise InvalidInputError(f"{name} は数値で指定してください（受け取った値: {value!r}）")
+    except (TypeError, ValueError) as error:
+        raise InvalidInputError(
+            f"{name} は数値で指定してください（受け取った値: {value!r}）"
+        ) from error
 
     if not np.isfinite(number):
         raise InvalidInputError(f"{name} に数値でない値（NaN / inf）が渡されました")
@@ -63,7 +64,7 @@ def _as_number(name: str, value) -> float:
     return number
 
 
-def validate_weather(values: Dict[str, float]) -> (Dict[str, float], List[str]):
+def validate_weather(values: dict[str, float]) -> (dict[str, float], list[str]):
     """入力の4項目を検証して、（そろえた値, 警告）を返す。
 
     アプリで入力できる範囲を外れた値は、止めずに範囲内へ丸めます。
@@ -148,7 +149,8 @@ class OutingService:
         result = Recommendation(
             category=classes[best],
             probabilities={
-                name: float(round(value, 4)) for name, value in zip(classes, probabilities)
+                name: float(round(value, 4))
+                for name, value in zip(classes, probabilities, strict=True)
             },
             confidence=float(round(probabilities[best], 4)),
             warnings=warnings,
@@ -198,7 +200,7 @@ class OutingService:
     # 補助
     # -----------------------------------------------------------
 
-    def _training_range_warnings(self, values: Dict[str, float]) -> List[str]:
+    def _training_range_warnings(self, values: dict[str, float]) -> list[str]:
         """学習データに無かった範囲の値には、警告をつける。
 
         予測は返しますが、その根拠は弱い（外挿している）ことを伝えます。
@@ -218,7 +220,7 @@ class OutingService:
 
         return warnings
 
-    def health(self) -> Dict[str, object]:
+    def health(self) -> dict[str, object]:
         """読み込めているモデルと、その版を返す（起動確認用）。"""
         return {
             "ok": True,

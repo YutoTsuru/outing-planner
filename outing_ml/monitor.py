@@ -14,7 +14,6 @@
 
 import argparse
 import json
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -76,7 +75,7 @@ def _status(psi: float, ks_statistic: float, spec=None) -> str:
     return "OK"
 
 
-def feature_drift(reference: pd.DataFrame, current: pd.DataFrame) -> List[Dict]:
+def feature_drift(reference: pd.DataFrame, current: pd.DataFrame) -> list[dict]:
     """入力の4項目それぞれについて、ずれを測る。"""
     rows = []
 
@@ -103,7 +102,7 @@ def feature_drift(reference: pd.DataFrame, current: pd.DataFrame) -> List[Dict]:
     return rows
 
 
-def prediction_drift(service, reference: pd.DataFrame, current: pd.DataFrame) -> Dict:
+def prediction_drift(service, reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     """予測の出方が変わっていないかを見る。
 
     入力が同じように見えても、予測の内訳（outdoor が減って indoor が増えた等）が
@@ -137,7 +136,7 @@ def prediction_drift(service, reference: pd.DataFrame, current: pd.DataFrame) ->
     }
 
 
-def drift_report(reference: pd.DataFrame, current: pd.DataFrame, service=None) -> Dict:
+def drift_report(reference: pd.DataFrame, current: pd.DataFrame, service=None) -> dict:
     """入力と予測のずれをまとめたレポートを返す。"""
     features = feature_drift(reference, current)
     statuses = [row["status"] for row in features]

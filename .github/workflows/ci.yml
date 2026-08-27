@@ -1,0 +1,44 @@
+name: CI
+
+# 目的：main に入るコードが「読める・動く・学習できる」ことを毎回機械で確かめる。
+#   1. lint    … 書き方のばらつきと、明らかな間違いを弾く
+#   2. test    … 55件のテスト（データ検証・ラベル・特徴量・評価・推論・監視）
+#   3. smoke   … 少量のデータで学習が最後まで通ることを確かめる
+#
+# 学習そのもの（本番のモデル作成）は CI では回しません。
+# 数分かかるうえ、成果物はコミットされたものを使うためです。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 依存関係のインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn joblib requests pytest ruff
+
+      - name: lint（ruff）
+        run: ruff check outing_ml tests train_*.py fetch_weather.py
+
+      - name: テスト
+        run: pytest tests -q
+
+      - name: 学習が最後まで通るか（スモークテスト）
+        run: python scripts/smoke_train.py

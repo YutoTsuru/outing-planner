@@ -15,7 +15,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -188,7 +188,7 @@ def summarize_clusters(df, X, model):
             "share": float(members.mean()),
             "center": {
                 column: float(round(value, 1))
-                for column, value in zip(FEATURE_COLUMNS, center)
+                for column, value in zip(FEATURE_COLUMNS, center, strict=True)
             },
             "examples": [f"{row.city} {row.date}" for row in nearest.itertuples()],
         }
@@ -286,7 +286,7 @@ def main():
 
     card = {
         "model_name": MODEL_NAME,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "task": "天気を似たものどうしにまとめる（教師なし学習・k-means）",
         "estimator": "Pipeline(StandardScaler, KMeans)",
         "features": FEATURE_COLUMNS,
