@@ -1,0 +1,121 @@
+{
+  "model_name": "outing-planner-next-day-forecast",
+  "created_at": "2026-08-27",
+  "task": "翌日の気象4項目を当てる多出力回帰",
+  "estimator": "MultiOutputRegressor(HistGradientBoostingRegressor)",
+  "targets": [
+    "temperature",
+    "rain_probability",
+    "wind_speed",
+    "humidity"
+  ],
+  "input_columns": [
+    "city",
+    "temperature_today",
+    "temperature_lag1",
+    "temperature_lag2",
+    "temperature_mean3",
+    "temperature_diff",
+    "rain_probability_today",
+    "rain_probability_lag1",
+    "rain_probability_lag2",
+    "rain_probability_mean3",
+    "rain_probability_diff",
+    "wind_speed_today",
+    "wind_speed_lag1",
+    "wind_speed_lag2",
+    "wind_speed_mean3",
+    "wind_speed_diff",
+    "humidity_today",
+    "humidity_lag1",
+    "humidity_lag2",
+    "humidity_mean3",
+    "humidity_diff",
+    "season_sin",
+    "season_cos"
+  ],
+  "lag_days": [
+    1,
+    2
+  ],
+  "dataset": {
+    "path": "data/weather_jp.csv",
+    "rows_used": 19701,
+    "train_rows": 16416,
+    "test_rows": 3285,
+    "split": "学習：〜2023年 ／ 評価：2024年（時間で分割）"
+  },
+  "metrics": {
+    "このモデル": {
+      "temperature": {
+        "mae": 1.6609903459320383,
+        "rmse": 2.18427874098858
+      },
+      "rain_probability": {
+        "mae": 24.047382825887905,
+        "rmse": 29.849031239049317
+      },
+      "wind_speed": {
+        "mae": 1.3559855603312392,
+        "rmse": 1.7637695288683395
+      },
+      "humidity": {
+        "mae": 7.880957989144527,
+        "rmse": 10.129392424924504
+      }
+    },
+    "持続予報（あした＝きょう）": {
+      "temperature": {
+        "mae": 1.8111415525114156,
+        "rmse": 2.468451779089991
+      },
+      "rain_probability": {
+        "mae": 27.09284627092846,
+        "rmse": 39.858959869612335
+      },
+      "wind_speed": {
+        "mae": 1.6330593607305937,
+        "rmse": 2.239841264216929
+      },
+      "humidity": {
+        "mae": 9.343074581430745,
+        "rmse": 12.623816007594824
+      }
+    },
+    "平年値（都市×月の平均）": {
+      "temperature": {
+        "mae": 2.490261076499741,
+        "rmse": 3.09764452163155
+      },
+      "rain_probability": {
+        "mae": 25.21176918849909,
+        "rmse": 31.10798073397246
+      },
+      "wind_speed": {
+        "mae": 1.4504644201978114,
+        "rmse": 1.8658566936104923
+      },
+      "humidity": {
+        "mae": 9.330897103209642,
+        "rmse": 11.668731823015834
+      }
+    }
+  },
+  "improvement_over_persistence": {
+    "temperature": 0.08290418072025929,
+    "rain_probability": 0.11240839794335089,
+    "wind_speed": 0.16966548005664528,
+    "humidity": 0.1564920176482545
+  },
+  "recommendation_agreement": {
+    "このモデル": 0.6286149162861492,
+    "持続予報（あした＝きょう）": 0.604261796042618,
+    "平年値（都市×月の平均）": 0.5762557077625571
+  },
+  "environment": {
+    "python": "3.13.14",
+    "scikit_learn": "1.9.0",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5"
+  }
+}
