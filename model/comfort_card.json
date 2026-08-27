@@ -1,0 +1,120 @@
+{
+  "model_name": "outing-planner-comfort-score",
+  "created_at": "2026-08-27",
+  "task": "おでかけ日和度（0〜100点）を当てる回帰",
+  "selected_model": "勾配ブースティング",
+  "estimator": "HistGradientBoostingRegressor",
+  "features": [
+    "temperature",
+    "rain_probability",
+    "wind_speed",
+    "humidity"
+  ],
+  "target": "comfort_score",
+  "score_noise": 6.0,
+  "noise_limit": {
+    "mae": 4.6494880416300255,
+    "rmse": 5.873516274924117,
+    "r2": 0.918435552289557
+  },
+  "dataset": {
+    "path": "data/weather_jp.csv",
+    "rows": 19728,
+    "score_mean": 68.83457564998349,
+    "score_std": 20.566421578449138
+  },
+  "training": {
+    "test_size": 0.2,
+    "cv_splits": 5,
+    "random_seed": 42
+  },
+  "cv_comparison": [
+    {
+      "モデル": "勾配ブースティング",
+      "MAE": 4.782330917828567,
+      "RMSE": 5.987758518083238,
+      "決定係数R2": 0.9150228573671078,
+      "MAEの標準偏差": 0.06846552858714694
+    },
+    {
+      "モデル": "ランダムフォレスト",
+      "MAE": 4.919223586072991,
+      "RMSE": 6.180048108436492,
+      "決定係数R2": 0.9094922008273685,
+      "MAEの標準偏差": 0.046929233813399786
+    },
+    {
+      "モデル": "決定木（深さ8）",
+      "MAE": 5.344914330264025,
+      "RMSE": 6.698697677505588,
+      "決定係数R2": 0.8936783181029988,
+      "MAEの標準偏差": 0.07951753048668718
+    },
+    {
+      "モデル": "線形回帰",
+      "MAE": 7.673335756675257,
+      "RMSE": 9.714399802521228,
+      "決定係数R2": 0.7763392364220127,
+      "MAEの標準偏差": 0.0452754934094225
+    },
+    {
+      "モデル": "ベースライン（平均点を答える）",
+      "MAE": 16.545700391497544,
+      "RMSE": 20.545728311150448,
+      "決定係数R2": -7.757334840681196e-05,
+      "MAEの標準偏差": 0.07916140920406646
+    }
+  ],
+  "test_metrics": {
+    "mae": 4.724634922252902,
+    "rmse": 5.938868101203967,
+    "r2": 0.9172523682850231,
+    "within_5_points": 0.607704004054739,
+    "within_10_points": 0.9067410035478966,
+    "max_error": 24.525067705848763
+  },
+  "examples": [
+    {
+      "input": {
+        "temperature": 22,
+        "rain_probability": 10,
+        "wind_speed": 2,
+        "humidity": 50
+      },
+      "score": 91.45897744437323
+    },
+    {
+      "input": {
+        "temperature": 15,
+        "rain_probability": 80,
+        "wind_speed": 4,
+        "humidity": 70
+      },
+      "score": 45.01083969756536
+    },
+    {
+      "input": {
+        "temperature": 33,
+        "rain_probability": 0,
+        "wind_speed": 2,
+        "humidity": 85
+      },
+      "score": 69.21937875203038
+    },
+    {
+      "input": {
+        "temperature": 5,
+        "rain_probability": 0,
+        "wind_speed": 8,
+        "humidity": 40
+      },
+      "score": 55.70043332641416
+    }
+  ],
+  "environment": {
+    "python": "3.13.14",
+    "scikit_learn": "1.9.0",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5"
+  }
+}
