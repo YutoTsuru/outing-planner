@@ -19,10 +19,12 @@ from outing_ml.config import CONFIG, FEATURE_COLUMNS
 TARGET_SUFFIX = "_next"
 
 
-def build_supervised_frame(raw: pd.DataFrame, spec=None) -> pd.DataFrame:
-    """1日ずつの気象データを、「あしたを当てる」ための表に組み直す。"""
-    spec = spec or CONFIG.forecast
+def _build_lag_frame(raw: pd.DataFrame, spec, with_target: bool) -> pd.DataFrame:
+    """ラグ・移動平均・前日差・季節をまとめて作る（学習用と予測用の共通部分）。
 
+    学習と本番で作り方が1文字でも違うと、静かに精度が落ちます。
+    with_target を切り替えるだけにして、特徴量の作り方は必ず1か所に保ちます。
+    """
     df = raw.copy()
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["city", "date"]).reset_index(drop=True)
@@ -44,15 +46,40 @@ def build_supervised_frame(raw: pd.DataFrame, spec=None) -> pd.DataFrame:
         )
         features[f"{column}_diff"] = df[column] - grouped[column].shift(1)
 
-        # 正解（あしたの値）
-        features[f"{column}{TARGET_SUFFIX}"] = grouped[column].shift(-1)
+        if with_target:
+            # 正解（あしたの値）
+            features[f"{column}{TARGET_SUFFIX}"] = grouped[column].shift(-1)
 
     # 季節。1年でひと回りするので、角度に直して sin と cos の2つで表す
     day_of_year = df["date"].dt.dayofyear
     features["season_sin"] = np.sin(2 * np.pi * day_of_year / 365.25)
     features["season_cos"] = np.cos(2 * np.pi * day_of_year / 365.25)
 
-    return features.dropna().reset_index(drop=True)
+    return features
+
+
+def build_supervised_frame(raw: pd.DataFrame, spec=None) -> pd.DataFrame:
+    """1日ずつの気象データを、「あしたを当てる」ための表に組み直す（学習用）。"""
+    spec = spec or CONFIG.forecast
+    return _build_lag_frame(raw, spec, with_target=True).dropna().reset_index(drop=True)
+
+
+def build_prediction_frame(raw: pd.DataFrame, spec=None) -> pd.DataFrame:
+    """いちばん新しい日から「あした」を予測するための1行を、都市ごとに作る（本番用）。
+
+    学習用と違って正解の列は作りません。作ってしまうと、
+    正解が無い最新の日（＝まさに予測したい日）が dropna で落ちてしまいます。
+    """
+    spec = spec or CONFIG.forecast
+    features = _build_lag_frame(raw, spec, with_target=False)
+    features = features.dropna().reset_index(drop=True)
+
+    if features.empty:
+        return features
+
+    # 都市ごとに、いちばん新しい日だけを残す
+    newest = features.groupby("city")["date"].transform("max")
+    return features[features["date"] == newest].reset_index(drop=True)
 
 
 def input_columns(features: pd.DataFrame) -> list[str]:
