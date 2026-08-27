@@ -32,7 +32,7 @@ jobs:
       - name: 依存関係のインストール
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy scikit-learn joblib requests pytest ruff
+          pip install pandas numpy scikit-learn joblib requests flask pytest ruff
 
       - name: lint（ruff）
         run: ruff check outing_ml tests scripts train_*.py fetch_weather.py app.py api.py webapp.py geocoding.py presentation.py
