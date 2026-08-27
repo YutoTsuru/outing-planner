@@ -1,0 +1,155 @@
+{
+  "entries": [
+    {
+      "model_name": "next-day-forecast",
+      "version": "v1",
+      "artifact": "model/forecast_model.pkl",
+      "task": "翌日の気象4項目を当てる多出力回帰（予測区間つき）",
+      "created_at": "2026-08-27T13:08:21+00:00",
+      "git_sha": "f4c1853",
+      "git_dirty": true,
+      "data": {
+        "path": "data/weather_jp.csv",
+        "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
+        "rows": 19728,
+        "cities": 9,
+        "date_from": "2019-01-01",
+        "date_to": "2024-12-31"
+      },
+      "params": {
+        "lag_days": [
+          1,
+          2
+        ]
+      },
+      "metrics": {
+        "walk_forward_temperature_mae": 1.649914092463105,
+        "walk_forward_rain_mae": 24.63493928190099,
+        "improvement_over_persistence": {
+          "temperature": 0.077475844235245,
+          "rain_probability": 0.07576775307166794,
+          "wind_speed": 0.175756410257484,
+          "humidity": 0.1609445255740577
+        },
+        "holdout_temperature_mae": 1.7045203544860357
+      },
+      "environment": {
+        "python": "3.13.14",
+        "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+        "scikit_learn": "1.9.0",
+        "numpy": "2.5.2",
+        "pandas": "2.3.3",
+        "joblib": "1.5.3"
+      }
+    },
+    {
+      "model_name": "weather-type-clustering",
+      "version": "v1",
+      "artifact": "model/weather_type_model.pkl",
+      "task": "天気を似たものどうしにまとめる（教師なし学習・k-means）",
+      "created_at": "2026-08-27T13:07:57+00:00",
+      "git_sha": "f4c1853",
+      "git_dirty": true,
+      "data": {
+        "path": "data/weather_jp.csv",
+        "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
+        "rows": 19728,
+        "cities": 9,
+        "date_from": "2019-01-01",
+        "date_to": "2024-12-31"
+      },
+      "params": {
+        "cluster_range": [
+          3,
+          8
+        ]
+      },
+      "metrics": {
+        "n_clusters": 4,
+        "silhouette": 0.2661945671184806,
+        "davies_bouldin": 1.19324183067875,
+        "stability_ari_min": 0.9914888504257051
+      },
+      "environment": {
+        "python": "3.13.14",
+        "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+        "scikit_learn": "1.9.0",
+        "numpy": "2.5.2",
+        "pandas": "2.3.3",
+        "joblib": "1.5.3"
+      }
+    },
+    {
+      "model_name": "comfort-regressor",
+      "version": "v1",
+      "artifact": "model/comfort_model.pkl",
+      "task": "おでかけ日和度（0〜100点）を当てる回帰",
+      "created_at": "2026-08-27T13:05:42+00:00",
+      "git_sha": "f4c1853",
+      "git_dirty": true,
+      "data": {
+        "path": "data/weather_jp.csv",
+        "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
+        "rows": 19728,
+        "cities": 9,
+        "date_from": "2019-01-01",
+        "date_to": "2024-12-31"
+      },
+      "params": {
+        "selected_model": "勾配ブースティング"
+      },
+      "metrics": {
+        "test_mae": 4.724634922252902,
+        "test_rmse": 5.938868101203967,
+        "test_r2": 0.9172523682850231,
+        "holdout_mae": 4.76365254464085,
+        "noise_floor_mae": 4.6494880416300255
+      },
+      "environment": {
+        "python": "3.13.14",
+        "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+        "scikit_learn": "1.9.0",
+        "numpy": "2.5.2",
+        "pandas": "2.3.3",
+        "joblib": "1.5.3"
+      }
+    },
+    {
+      "model_name": "category-classifier",
+      "version": "v1",
+      "artifact": "model/outing_model.pkl",
+      "task": "天気からお出かけカテゴリを当てる3クラス分類",
+      "created_at": "2026-08-27T13:04:08+00:00",
+      "git_sha": "f4c1853",
+      "git_dirty": true,
+      "data": {
+        "path": "data/weather_jp.csv",
+        "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
+        "rows": 19728,
+        "cities": 9,
+        "date_from": "2019-01-01",
+        "date_to": "2024-12-31"
+      },
+      "params": {
+        "selected_model": "勾配ブースティング",
+        "calibrated": false
+      },
+      "metrics": {
+        "test_accuracy": 0.8172833248859604,
+        "test_macro_f1": 0.8102442727069353,
+        "test_log_loss": 0.4770901188218497,
+        "test_ece": 0.013027406256676184,
+        "holdout_accuracy": 0.821142750790992,
+        "bayes_limit": 0.8222836790845263
+      },
+      "environment": {
+        "python": "3.13.14",
+        "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+        "scikit_learn": "1.9.0",
+        "numpy": "2.5.2",
+        "pandas": "2.3.3",
+        "joblib": "1.5.3"
+      }
+    }
+  ]
+}

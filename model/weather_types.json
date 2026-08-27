@@ -1,6 +1,6 @@
 {
-  "model_name": "outing-planner-weather-types",
-  "created_at": "2026-08-27",
+  "model_name": "weather-type-clustering",
+  "created_at": "2026-08-27T13:07:57+00:00",
   "task": "天気を似たものどうしにまとめる（教師なし学習・k-means）",
   "estimator": "Pipeline(StandardScaler, KMeans)",
   "features": [
@@ -14,35 +14,58 @@
     {
       "タイプ数": 3,
       "シルエット係数": 0.259640140222722,
+      "CalinskiHarabasz": 8326.208431002107,
+      "DaviesBouldin": 1.3268599469909919,
       "まとまりの悪さ": 42788.73922928441
     },
     {
       "タイプ数": 4,
       "シルエット係数": 0.2661945671184806,
+      "CalinskiHarabasz": 7840.448472410919,
+      "DaviesBouldin": 1.19324183067875,
       "まとまりの悪さ": 35991.404671283184
     },
     {
       "タイプ数": 5,
       "シルエット係数": 0.26254248963227805,
-      "まとまりの悪さ": 31863.914395287524
+      "CalinskiHarabasz": 7280.438908401553,
+      "DaviesBouldin": 1.2766088965898343,
+      "まとまりの悪さ": 31863.914395287527
     },
     {
       "タイプ数": 6,
       "シルエット係数": 0.2624311929286012,
-      "まとまりの悪さ": 28734.964299478088
+      "CalinskiHarabasz": 6887.812621629673,
+      "DaviesBouldin": 1.1577433217212088,
+      "まとまりの悪さ": 28734.964299478095
     },
     {
       "タイプ数": 7,
       "シルエット係数": 0.25356460692039856,
+      "CalinskiHarabasz": 6575.647742916483,
+      "DaviesBouldin": 1.2182478759131796,
       "まとまりの悪さ": 26298.770960621558
     },
     {
       "タイプ数": 8,
       "シルエット係数": 0.24779310109679917,
+      "CalinskiHarabasz": 6370.069075878323,
+      "DaviesBouldin": 1.2088754285439816,
       "まとまりの悪さ": 24197.46690326634
     }
   ],
   "silhouette": 0.2661945671184806,
+  "stability": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "adjusted_rand_mean": 0.9965955401702822,
+    "adjusted_rand_min": 0.9914888504257051
+  },
   "clusters": [
     {
       "id": 3,
@@ -133,14 +156,33 @@
       }
     }
   ],
-  "dataset": {
-    "path": "data/weather_jp.csv",
-    "rows": 19728
+  "holdout": {
+    "rows": 5373,
+    "date_from": "2025-01-01",
+    "date_to": "2026-08-20",
+    "share": {
+      "0": 0.3527,
+      "1": 0.2215,
+      "2": 0.0583,
+      "3": 0.3676
+    }
   },
+  "data": {
+    "path": "data/weather_jp.csv",
+    "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
+    "rows": 19728,
+    "cities": 9,
+    "date_from": "2019-01-01",
+    "date_to": "2024-12-31"
+  },
+  "version": "v1",
+  "git_sha": "f4c1853",
   "environment": {
     "python": "3.13.14",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
     "scikit_learn": "1.9.0",
     "numpy": "2.5.2",
-    "pandas": "3.0.5"
+    "pandas": "2.3.3",
+    "joblib": "1.5.3"
   }
 }
