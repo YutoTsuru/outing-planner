@@ -15,5 +15,12 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# リポジトリ直下を import 先に加える（outing_ml を見つけられるようにする）。
+#
+# これが無いと `python -m pytest` では通るのに `pytest` では
+# ModuleNotFoundError: No module named 'outing_ml' で落ちる。
+# python -m はカレントディレクトリを sys.path に入れるが、pytest コマンドは入れないため。
+# 手元とCIで実行のしかたが違うと、手元だけ緑になって気づけない。
+pythonpath = ["."]
 # 日本語のテスト名をそのまま表示する
 addopts = "-v --tb=short"
