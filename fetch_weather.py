@@ -2,73 +2,57 @@
 お出かけプランナー：気象データ取得スクリプト
 
 Open-Meteo の「過去の天気アーカイブ」から、日本の主要9都市の実測気象データを
-ダウンロードして、1行=1日の CSV（data/weather_jp.csv）にまとめます。
+ダウンロードして、1行=1日の CSV にまとめます。
 
-このCSVが train_model.py の学習データになります。
-APIキーは不要で、非商用利用は無料です（出典：Open-Meteo / ERA5 再解析データ）。
+    data/weather_jp.csv          学習・検証に使う（2019〜2024年）
+    data/weather_jp_holdout.csv  学習後に一度だけ使う「未来のデータ」（2025年〜）
 
-取り出す値は、アプリの入力欄と同じ4つです。
-お出かけする時間帯（9時〜18時）の値だけを使って、1日ぶんに平均します。
+学習データと未来データを分けているのは、
+「学習が終わったあとに一度だけ見る、まったく触っていないデータ」を残しておくためです。
+何度も見て調整したデータでは、成績が良く見えて当たり前になってしまいます。
+
+APIキーは不要で、非商用利用は無料です（出典：Open-Meteo / ECMWF ERA5、CC BY 4.0）。
 
 実行方法:
-    python fetch_weather.py            # data/weather_jp.csv を作る
-    python fetch_weather.py --force    # すでにCSVがあっても作り直す
+    python fetch_weather.py              # 学習データを作る
+    python fetch_weather.py --holdout    # 未来データを作る
+    python fetch_weather.py --all        # 両方
+    python fetch_weather.py --force      # すでにあっても作り直す
 """
 
 import argparse
 import os
 import time
+from datetime import date, timedelta
 
 import pandas as pd
 import requests
 
+from outing_ml.config import CONFIG
+from outing_ml.data import validate_frame
+
 # 取得先（Open-Meteo の過去データ用エンドポイント。APIキー不要）
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
-# 保存先
-DATA_DIR = "data"
-DATA_PATH = os.path.join(DATA_DIR, "weather_jp.csv")
-
-# 取得する期間（6年ぶん）
-START_DATE = "2019-01-01"
-END_DATE = "2024-12-31"
-
-# お出かけする時間帯（9時〜18時の10時間）。この範囲の値だけを使う
-OUTING_HOURS = list(range(9, 19))
-
-# 取得する都市（北から南まで、気候がかたよらないように選んでいる）
-CITIES = [
-    ("札幌", 43.0621, 141.3544),
-    ("仙台", 38.2682, 140.8694),
-    ("新潟", 37.9161, 139.0364),
-    ("東京", 35.6895, 139.6917),
-    ("名古屋", 35.1815, 136.9066),
-    ("大阪", 34.6937, 135.5023),
-    ("高知", 33.5597, 133.5311),
-    ("福岡", 33.5904, 130.4017),
-    ("那覇", 26.2124, 127.6809),
-]
-
-# 「雨が降っている」とみなす1時間あたりの雨量（mm）
-RAIN_THRESHOLD_MM = 0.1
-
-# 都市ごとの取得の間隔（サーバーに負荷をかけないよう少し待つ）
-REQUEST_INTERVAL_SEC = 1.0
+DATA_DIR = CONFIG.paths.data_dir
+DATA_PATH = CONFIG.paths.dataset
+HOLDOUT_PATH = CONFIG.paths.holdout
 
 
-def fetch_city_hourly(name, latitude, longitude):
+def fetch_city_hourly(name, latitude, longitude, start_date, end_date):
     """1都市ぶんの「1時間ごとの気象データ」を取得して DataFrame で返す。"""
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "start_date": START_DATE,
-        "end_date": END_DATE,
+        "start_date": start_date,
+        "end_date": end_date,
         "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation",
         "wind_speed_unit": "ms",       # 風速の単位を m/s にそろえる（既定は km/h）
         "timezone": "Asia/Tokyo",      # 日本時間で日付を区切る
     }
 
-    response = requests.get(ARCHIVE_URL, params=params, timeout=120)
+    response = requests.get(ARCHIVE_URL, params=params,
+                            timeout=CONFIG.data.request_timeout_sec)
     response.raise_for_status()
     hourly = response.json()["hourly"]
 
@@ -87,12 +71,13 @@ def fetch_city_hourly(name, latitude, longitude):
 
 def summarize_by_day(df):
     """1時間ごとのデータを、1日1行のデータにまとめる。"""
-    # お出かけ時間帯だけを残す
-    df = df[df["time"].dt.hour.isin(OUTING_HOURS)].copy()
+    hours = list(CONFIG.data.outing_hours)
+    df = df[df["time"].dt.hour.isin(hours)].copy()
 
-    # 欠測（値が無い時間）がある日は、平均がゆがむので後でまとめて落とす
     df["date"] = df["time"].dt.date
-    df["is_rainy_hour"] = (df["precipitation"] >= RAIN_THRESHOLD_MM).astype(float)
+    df["is_rainy_hour"] = (
+        df["precipitation"] >= CONFIG.data.rain_threshold_mm
+    ).astype(float)
 
     grouped = df.groupby(["city", "date"]).agg(
         temperature=("temperature", "mean"),
@@ -104,10 +89,10 @@ def summarize_by_day(df):
     )
 
     # 10時間そろっていない日・欠測がある日は使わない
-    grouped = grouped[(grouped["hours"] == len(OUTING_HOURS)) & (grouped["missing"] == 0)]
+    grouped = grouped[(grouped["hours"] == len(hours)) & (grouped["missing"] == 0)]
 
     # 「10時間のうち何時間 雨だったか」を割合（%）にして、降水確率のかわりに使う
-    grouped["rain_probability"] = grouped["rain_hours"] / len(OUTING_HOURS) * 100
+    grouped["rain_probability"] = grouped["rain_hours"] / len(hours) * 100
 
     result = grouped.reset_index()[
         ["city", "date", "temperature", "rain_probability", "wind_speed", "humidity"]
@@ -119,41 +104,83 @@ def summarize_by_day(df):
     return result
 
 
-def download_all():
+def download_range(start_date, end_date):
     """全都市ぶんを取得して、1つの DataFrame にまとめる。"""
     frames = []
+    cities = CONFIG.data.cities
 
-    for index, (name, latitude, longitude) in enumerate(CITIES, start=1):
-        print(f"  [{index}/{len(CITIES)}] {name} を取得中...", flush=True)
-        hourly = fetch_city_hourly(name, latitude, longitude)
+    for index, (name, latitude, longitude) in enumerate(cities, start=1):
+        print(f"  [{index}/{len(cities)}] {name} を取得中...", flush=True)
+        hourly = fetch_city_hourly(name, latitude, longitude, start_date, end_date)
         daily = summarize_by_day(hourly)
         print(f"      {len(daily)} 日ぶん")
         frames.append(daily)
 
-        if index < len(CITIES):
-            time.sleep(REQUEST_INTERVAL_SEC)
+        if index < len(cities):
+            time.sleep(CONFIG.data.request_interval_sec)
 
     return pd.concat(frames, ignore_index=True).sort_values(["city", "date"])
 
 
-def main():
-    parser = argparse.ArgumentParser(description="気象データをダウンロードしてCSVに保存する")
-    parser.add_argument("--force", action="store_true", help="CSVがすでにあっても作り直す")
-    args = parser.parse_args()
+def download_all():
+    """学習データの期間を取得する（train_model.py から呼ばれる）。"""
+    return download_range(CONFIG.data.start_date, CONFIG.data.end_date)
 
-    if os.path.exists(DATA_PATH) and not args.force:
-        print(f"すでにデータがあります: {DATA_PATH}")
-        print("作り直すときは python fetch_weather.py --force を実行してください。")
-        return
 
-    print(f"Open-Meteo から気象データを取得します（{START_DATE} 〜 {END_DATE}）")
-    df = download_all()
+def holdout_end_date():
+    """未来データの終わりの日。
+
+    アーカイブは数日おくれて更新されるため、直近1週間は取りません。
+    """
+    return (date.today() - timedelta(days=CONFIG.data.holdout_lag_days)).isoformat()
+
+
+def save(df, path):
+    """検証してから保存する。"""
+    report = validate_frame(df)
+    if not report.ok:
+        print("  検証に失敗しました:")
+        for error in report.errors:
+            print(f"    - {error}")
+        raise SystemExit(1)
+
+    for warning in report.warnings:
+        print(f"  ⚠ {warning}")
 
     os.makedirs(DATA_DIR, exist_ok=True)
-    df.to_csv(DATA_PATH, index=False)
+    df.to_csv(path, index=False)
+    print(f"\n保存しました: {path}（{len(df)} 行）")
 
-    print(f"\n保存しました: {DATA_PATH}（{len(df)} 行）")
-    print("次は python train_model.py でモデルを学習してください。")
+
+def build(path, start_date, end_date, label, force):
+    """1つのデータセットを作る。"""
+    if os.path.exists(path) and not force:
+        print(f"すでにあります: {path}（作り直すときは --force）")
+        return
+
+    print(f"\n{label}を取得します（{start_date} 〜 {end_date}）")
+    save(download_range(start_date, end_date), path)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="気象データをダウンロードしてCSVに保存する")
+    parser.add_argument("--holdout", action="store_true", help="未来データだけを作る")
+    parser.add_argument("--all", action="store_true", help="学習データと未来データの両方を作る")
+    parser.add_argument("--force", action="store_true", help="すでにあっても作り直す")
+    args = parser.parse_args()
+
+    want_train = args.all or not args.holdout
+    want_holdout = args.all or args.holdout
+
+    if want_train:
+        build(DATA_PATH, CONFIG.data.start_date, CONFIG.data.end_date,
+              "学習データ", args.force)
+
+    if want_holdout:
+        build(HOLDOUT_PATH, CONFIG.data.holdout_start_date, holdout_end_date(),
+              "未来データ（ホールドアウト）", args.force)
+
+    print("\n次は python train_all.py でモデルを学習してください。")
 
 
 if __name__ == "__main__":
