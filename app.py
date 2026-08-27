@@ -9,7 +9,7 @@ Google Maps でスポットを探して、時間つきのお出かけプラン�
 画面は「STEP 1 → STEP 2 → STEP 3」の順に進み、
 前のステップが終わると次のカードが表示されます。
 
-起動前に train_model.py を実行して、モデルを作成しておいてください。
+起動前に train_all.py を実行して、モデルを作成しておいてください。
 Google Maps 連携を使うときは、このフォルダに google_maps_api_key.txt を作って
 APIキーを書くか、環境変数 GOOGLE_MAPS_API_KEY に設定します。
 （未設定でもアプリは動きます。その場合はGoogleマップの検索リンクを表示します）
@@ -18,25 +18,17 @@ APIキーを書くか、環境変数 GOOGLE_MAPS_API_KEY に設定します。
     python app.py
 """
 
-import os
 
 import gradio as gr
-import joblib
-import pandas as pd
 
 import maps_api
 import osm_api
 import planner
+from outing_ml.serve import OutingService
 
 # ---------------------------------------------------------------
 # 設定・固定データ
 # ---------------------------------------------------------------
-
-# モデルの場所（train_model.py と合わせる）
-MODEL_PATH = os.path.join("model", "outing_model.pkl")
-
-# 特徴量の列名（train_model.py と同じ順番にすること）
-FEATURE_COLUMNS = ["temperature", "rain_probability", "wind_speed", "humidity"]
 
 # カテゴリの (アイコン, 表示名)
 CATEGORY_LABELS = {
@@ -98,27 +90,23 @@ def scroll_to_js(element_id):
 # モデル関連の関数
 # ---------------------------------------------------------------
 
-def load_model():
-    """学習済みモデルを読み込む。"""
-    if not os.path.exists(MODEL_PATH):
+def load_service():
+    """学習済みモデルを読み込む。
+
+    予測は必ず outing_ml.serve を通します。直接 joblib.load して predict すると、
+    特徴量の順番がズレても気づけず、学習していない範囲の値を渡しても
+    それと分からないまま答えが返ってきてしまうためです。
+    """
+    try:
+        return OutingService.load()
+    except FileNotFoundError as error:
         raise FileNotFoundError(
-            f"モデルが見つかりません: {MODEL_PATH}\n"
-            "先に python train_model.py を実行してください。"
-        )
-    return joblib.load(MODEL_PATH)
+            f"{error}\n先に python train_all.py を実行してください。"
+        ) from error
 
 
 # アプリ起動時に1回だけモデルを読み込む
-model = load_model()
-
-
-def predict_category(temperature, rain_probability, wind_speed, humidity):
-    """入力値からカテゴリ（outdoor / indoor / relax）を予測する。"""
-    input_df = pd.DataFrame(
-        [[temperature, rain_probability, wind_speed, humidity]],
-        columns=FEATURE_COLUMNS,
-    )
-    return model.predict(input_df)[0]
+service = load_service()
 
 
 def build_reason(label, temperature, rain_probability, wind_speed, humidity):
@@ -141,12 +129,32 @@ def build_reason(label, temperature, rain_probability, wind_speed, humidity):
     return "今日は無理せず、リラックスできる場所でゆっくり過ごすのがおすすめです。"
 
 
-def build_result_html(label, reason):
+def build_result_html(result, reason):
     """予測結果のカードの中身（HTML）を作る。"""
-    emoji, name = CATEGORY_LABELS[label]
+    emoji, name = CATEGORY_LABELS[result.category]
     chips = "".join(
-        f'<span class="chip">{spot}</span>' for spot in CATEGORY_SPOTS[label]
+        f'<span class="chip">{spot}</span>' for spot in CATEGORY_SPOTS[result.category]
     )
+
+    # カテゴリだけでなく、確信度・日和度・天気タイプも並べて出す
+    items = [("AIの確信度", f"{result.confidence * 100:.0f}%")]
+    if result.comfort_score is not None:
+        items.append(("おでかけ日和度", f"{result.comfort_score:.0f}点"))
+    if result.weather_type_name:
+        items.append(("今日の天気タイプ", result.weather_type_name))
+
+    metrics = "".join(
+        f'<div class="metric"><span class="metric-label">{label}</span>'
+        f'<span class="metric-value">{value}</span></div>'
+        for label, value in items
+    )
+
+    # 学習した範囲の外の値を渡されたときは、予測は返しつつ注意書きを出す
+    warning = ""
+    if result.warnings:
+        lines = "<br>".join(f"・{text}" for text in result.warnings)
+        warning = f'<p class="result-warning">{lines}</p>'
+
     return f"""
 <div class="result-hero">
   <div class="result-emoji">{emoji}</div>
@@ -156,6 +164,8 @@ def build_result_html(label, reason):
   </div>
 </div>
 <p class="result-reason">{reason}</p>
+{warning}
+<div class="result-metrics">{metrics}</div>
 <p class="result-subtitle">こんな場所がおすすめ</p>
 <div class="chip-list">{chips}</div>
 """
@@ -163,12 +173,14 @@ def build_result_html(label, reason):
 
 def recommend(temperature, rain_probability, wind_speed, humidity):
     """予測ボタンが押されたときに Gradio から呼ばれるメインの関数。"""
-    label = predict_category(temperature, rain_probability, wind_speed, humidity)
-    reason = build_reason(label, temperature, rain_probability, wind_speed, humidity)
+    result = service.predict(temperature, rain_probability, wind_speed, humidity)
+    reason = build_reason(
+        result.category, temperature, rain_probability, wind_speed, humidity
+    )
 
     return (
-        build_result_html(label, reason),   # 結果カードの中身
-        label,                              # プラン作成のために覚えておく（gr.State）
+        build_result_html(result, reason),  # 結果カードの中身
+        result.category,                    # プラン作成のために覚えておく（gr.State）
         gr.update(visible=True),            # STEP 2 のカードを表示する
         gr.update(visible=True),            # STEP 3 のカードを表示する
     )
@@ -582,6 +594,49 @@ input[type="range"] {
     color: #4a5160;
     font-size: 0.93rem;
     line-height: 1.8;
+}
+
+.result-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 18px;
+}
+
+.metric {
+    flex: 1 1 140px;
+    padding: 12px 14px;
+    background: #fbfcfe;
+    border: 1px solid #e6ebf2;
+    border-radius: 12px;
+}
+
+.metric-label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.metric-value {
+    display: block;
+    margin-top: 4px;
+    color: #3d4351;
+    font-size: 1.02rem;
+    font-weight: 800;
+    line-height: 1.4;
+}
+
+.result-warning {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    background: #fff8e6;
+    border-left: 4px solid #f0b429;
+    border-radius: 4px 12px 12px 4px;
+    color: #7a5b12;
+    font-size: 0.82rem;
+    line-height: 1.7;
 }
 
 .result-subtitle {
