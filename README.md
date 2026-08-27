@@ -25,6 +25,20 @@ Python授業用のサンプルとして、機械学習（scikit-learn）・Web�
 モデルは、日本9都市・6年ぶん（19,728日）の実測気象データで学習しています。
 どんなモデルなのか・どこまで当たるのか・何が苦手なのかは [doc/README.md](doc/README.md) にまとめてあります。
 
+### 3. 4つのモデル
+
+このプロジェクトには、役割のちがう4つのモデルが入っています。
+機械学習の3つの型（分類・回帰・教師なし学習）をひと通りためせる構成です。
+
+| # | モデル | 学習の種類 | やること | 成績 | 説明 |
+| --- | --- | --- | --- | --- | --- |
+| ① | カテゴリ予測 | 教師あり・**分類** | 天気 → outdoor / indoor / relax | 正解率 0.817（上限 0.822） | [doc/README.md](doc/README.md) |
+| ② | 翌日の天気予測 | 教師あり・**回帰（時系列）** | きょうまでの天気 → あしたの天気 | 気温 MAE 1.66℃ | [doc/forecast.md](doc/forecast.md) |
+| ③ | おでかけ日和度 | 教師あり・**回帰** | 天気 → 0〜100点 | MAE 4.72点（下限 4.65点） | [doc/comfort.md](doc/comfort.md) |
+| ④ | 天気タイプ分け | **教師なし**・クラスタリング | 天気 → 4つのタイプ | シルエット係数 0.266 | [doc/weather-types.md](doc/weather-types.md) |
+
+アプリが実際に使っているのは①です。②〜④は、①と同じデータから作った発展用のモデルです。
+
 ### 2. お出かけプランの作成
 
 予測のあと、場所と時間を指定すると、その時間内でまわれるタイムスケジュールを作ります。
@@ -89,7 +103,7 @@ Hugging Face Spaces で動かす場合は、Space の Settings → Variables and
 - Python 3.10 以上を推奨
 - Gradio（Web UI）
 - pandas / NumPy（データ処理）
-- scikit-learn（機械学習：HistGradientBoostingClassifier）
+- scikit-learn（機械学習：分類・回帰・クラスタリング）
 - joblib（モデルの保存・読み込み）
 
 ## ファイル構成
@@ -101,17 +115,30 @@ outing-planner/
 ├─ osm_api.py        # OpenStreetMap との連携（キー不要のスポット検索）
 ├─ planner.py        # お出かけプランの組み立て（時間割づくり、スポット割り当て）
 ├─ fetch_weather.py  # 気象データの取得（Open-Meteo → data/weather_jp.csv）
-├─ train_model.py    # モデル学習スクリプト（ラベル付け→モデル選定→学習→保存）
+├─ train_all.py      # ①〜④のモデルをまとめて学習する
+├─ train_model.py           # ① カテゴリ予測モデル（分類）
+├─ train_forecast.py        # ② 翌日の天気予測モデル（時系列の回帰）
+├─ train_comfort.py         # ③ おでかけ日和度モデル（回帰）
+├─ train_weather_types.py   # ④ 天気タイプ分けモデル（教師なし）
 ├─ requirements.txt  # 必要なライブラリ一覧
 ├─ README.md         # このファイル
 ├─ data/
 │  └─ weather_jp.csv    # 学習データ（9都市・6年ぶんの実測気象データ）
 ├─ doc/
-│  ├─ README.md         # モデルカード（モデルの説明書）
-│  └─ dataset.md        # データセットの説明書
+│  ├─ README.md         # モデル一覧＋①のモデルカード
+│  ├─ dataset.md        # データセットの説明書
+│  ├─ forecast.md       # ② のモデルカード
+│  ├─ comfort.md        # ③ のモデルカード
+│  └─ weather-types.md  # ④ のモデルカード
 └─ model/
-   ├─ outing_model.pkl  # 学習済みモデル（train_model.py 実行で作成される）
-   └─ model_card.json   # 成績や設定の記録（同上）
+   ├─ outing_model.pkl       # ① 学習済みモデル（アプリが読み込む）
+   ├─ model_card.json        # ① 成績や設定の記録
+   ├─ forecast_model.pkl     # ② 学習済みモデル
+   ├─ forecast_card.json     # ② 成績や設定の記録
+   ├─ comfort_model.pkl      # ③ 学習済みモデル
+   ├─ comfort_card.json      # ③ 成績や設定の記録
+   ├─ weather_type_model.pkl # ④ 学習済みモデル
+   └─ weather_types.json     # ④ タイプの一覧と成績
 ```
 
 ## セットアップ方法
@@ -130,8 +157,20 @@ pip install -r requirements.txt
 
 ```bash
 python fetch_weather.py    # 気象データをダウンロード（初回のみ・数十秒）
-python train_model.py      # ラベル付け → モデル選定 → 学習 → 保存
+python train_all.py        # 4つのモデルをまとめて学習（20秒ほど）
 ```
+
+1つずつ作ることもできます。アプリを動かすだけなら①だけで足ります。
+
+```bash
+python train_model.py           # ① カテゴリ予測（アプリが使うのはこれ）
+python train_forecast.py        # ② 翌日の天気予測
+python train_comfort.py         # ③ おでかけ日和度
+python train_weather_types.py   # ④ 天気タイプ分け
+```
+
+※ ②〜④は①のモデルを参照するので、`train_model.py` を先に実行してください
+（`train_all.py` は正しい順に実行します）。
 
 `fetch_weather.py` は [Open-Meteo](https://open-meteo.com/) の過去データAPIから、
 日本9都市・6年ぶん（2019〜2024年）の実測気象データを取得して `data/weather_jp.csv` に保存します。
@@ -144,7 +183,9 @@ APIキーは不要です（出典：Open-Meteo / ECMWF ERA5、CC BY 4.0）。
 - `model/outing_model.pkl` … 学習済みモデル（アプリが読み込む）
 - `model/model_card.json` … 成績・設定・データの記録
 
-データが無いときは自動でダウンロードするため、`python train_model.py` だけでも動きます。
+②〜④も同じように、成績や設定を `model/*_card.json`（④は `weather_types.json`）に書き出します。
+データが無いときは自動でダウンロードするため、学習スクリプトだけでも動きます。
+乱数の種を固定しているので、**何度実行しても同じ結果**になります。
 成績や限界などのくわしい説明は [doc/README.md](doc/README.md)、
 学習データそのものの説明は [doc/dataset.md](doc/dataset.md) にあります。
 
@@ -165,7 +206,7 @@ python app.py
 ```bash
 pip install -r requirements.txt
 python fetch_weather.py
-python train_model.py
+python train_all.py
 python app.py
 ```
 
@@ -175,6 +216,9 @@ python app.py
 
 - `predict_category()` … 天気APIから取得した実際の気象データを渡すように差し替え可能
 - `model.predict_proba()` … 予測の確率を取り出せるので、「おすすめ度○%」の表示にも使える
+- `model/comfort_model.pkl` … 「今日のおでかけ日和度 91点」を画面に足せる
+- `model/weather_type_model.pkl` … 同じ屋外観光でも、天気タイプで行き先を変えられる
+- `model/forecast_model.pkl` … 「あしたのプラン」を作るときの下ごしらえに使える
 - `build_reason()` … LLMによる理由生成に置き換え可能
 - `planner.STAY_MINUTES` / `TRAVEL_MINUTES` … 滞在時間・移動時間の目安を調整可能
 - `planner.KIND_KEYWORDS` … スポット検索のキーワードを増やすと、行き先のバリエーションが広がる
