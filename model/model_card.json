@@ -1,7 +1,9 @@
 {
-  "model_name": "outing-planner-category-classifier",
-  "created_at": "2026-08-27",
+  "model_name": "category-classifier",
+  "created_at": "2026-08-27T13:04:08+00:00",
+  "task": "天気からお出かけカテゴリを当てる3クラス分類",
   "selected_model": "勾配ブースティング",
+  "runner_up": "ランダムフォレスト",
   "estimator": "HistGradientBoostingClassifier",
   "features": [
     "temperature",
@@ -14,13 +16,15 @@
     "outdoor",
     "relax"
   ],
-  "dataset": {
+  "data": {
     "path": "data/weather_jp.csv",
-    "source": "Open-Meteo Historical Weather API (ERA5)",
+    "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
     "rows": 19728,
     "cities": 9,
     "date_from": "2019-01-01",
-    "date_to": "2024-12-31",
+    "date_to": "2024-12-31"
+  },
+  "dataset": {
     "label_counts": {
       "indoor": 7651,
       "outdoor": 6525,
@@ -98,10 +102,131 @@
       "対数損失": 1.0900952441631337
     }
   ],
+  "calibration": {
+    "before": {
+      "ece": 0.013027406256676184,
+      "log_loss": 0.4770901188218497,
+      "bins": [
+        {
+          "range": "0.3-0.4",
+          "count": 21,
+          "confidence": 0.3822,
+          "accuracy": 0.4762,
+          "gap": 0.094
+        },
+        {
+          "range": "0.4-0.5",
+          "count": 208,
+          "confidence": 0.4631,
+          "accuracy": 0.476,
+          "gap": 0.0128
+        },
+        {
+          "range": "0.5-0.6",
+          "count": 362,
+          "confidence": 0.5477,
+          "accuracy": 0.5608,
+          "gap": 0.0131
+        },
+        {
+          "range": "0.6-0.7",
+          "count": 355,
+          "confidence": 0.6512,
+          "accuracy": 0.6169,
+          "gap": -0.0343
+        },
+        {
+          "range": "0.7-0.8",
+          "count": 454,
+          "confidence": 0.7503,
+          "accuracy": 0.7599,
+          "gap": 0.0096
+        },
+        {
+          "range": "0.8-0.9",
+          "count": 661,
+          "confidence": 0.8534,
+          "accuracy": 0.8154,
+          "gap": -0.038
+        },
+        {
+          "range": "0.9-1.0",
+          "count": 1885,
+          "confidence": 0.96,
+          "accuracy": 0.9602,
+          "gap": 0.0002
+        }
+      ]
+    },
+    "after": {
+      "ece": 0.012340287352421857,
+      "log_loss": 0.4816916672232237,
+      "bins": [
+        {
+          "range": "0.3-0.4",
+          "count": 24,
+          "confidence": 0.3797,
+          "accuracy": 0.4583,
+          "gap": 0.0786
+        },
+        {
+          "range": "0.4-0.5",
+          "count": 181,
+          "confidence": 0.4693,
+          "accuracy": 0.4641,
+          "gap": -0.0052
+        },
+        {
+          "range": "0.5-0.6",
+          "count": 403,
+          "confidence": 0.5474,
+          "accuracy": 0.5484,
+          "gap": 0.001
+        },
+        {
+          "range": "0.6-0.7",
+          "count": 431,
+          "confidence": 0.6515,
+          "accuracy": 0.6543,
+          "gap": 0.0028
+        },
+        {
+          "range": "0.7-0.8",
+          "count": 551,
+          "confidence": 0.7522,
+          "accuracy": 0.775,
+          "gap": 0.0228
+        },
+        {
+          "range": "0.8-0.9",
+          "count": 840,
+          "confidence": 0.8543,
+          "accuracy": 0.8655,
+          "gap": 0.0112
+        },
+        {
+          "range": "0.9-1.0",
+          "count": 1516,
+          "confidence": 0.9562,
+          "accuracy": 0.971,
+          "gap": 0.0147
+        }
+      ]
+    },
+    "calibrated": false,
+    "method": "none"
+  },
   "test_metrics": {
-    "accuracy": 0.8172833248859604,
-    "macro_f1": 0.8102442727069353,
-    "log_loss": 0.4770901188218497,
+    "accuracy": {
+      "value": 0.8172833248859604,
+      "low": 0.8051191079574253,
+      "high": 0.8297009630005069
+    },
+    "macro_f1": {
+      "value": 0.8102442727069353,
+      "low": 0.7981712841239752,
+      "high": 0.8222413069383143
+    },
     "confusion_matrix": [
       [
         1296,
@@ -119,6 +244,7 @@
         797
       ]
     ],
+    "log_loss": 0.4770901188218497,
     "per_class": {
       "indoor": {
         "precision": 0.8657314629258517,
@@ -151,6 +277,244 @@
         "f1-score": 0.8167234412232754,
         "support": 3946.0
       }
+    },
+    "calibration": {
+      "ece": 0.013027406256676184,
+      "bins": [
+        {
+          "range": "0.3-0.4",
+          "count": 21,
+          "confidence": 0.3822,
+          "accuracy": 0.4762,
+          "gap": 0.094
+        },
+        {
+          "range": "0.4-0.5",
+          "count": 208,
+          "confidence": 0.4631,
+          "accuracy": 0.476,
+          "gap": 0.0128
+        },
+        {
+          "range": "0.5-0.6",
+          "count": 362,
+          "confidence": 0.5477,
+          "accuracy": 0.5608,
+          "gap": 0.0131
+        },
+        {
+          "range": "0.6-0.7",
+          "count": 355,
+          "confidence": 0.6512,
+          "accuracy": 0.6169,
+          "gap": -0.0343
+        },
+        {
+          "range": "0.7-0.8",
+          "count": 454,
+          "confidence": 0.7503,
+          "accuracy": 0.7599,
+          "gap": 0.0096
+        },
+        {
+          "range": "0.8-0.9",
+          "count": 661,
+          "confidence": 0.8534,
+          "accuracy": 0.8154,
+          "gap": -0.038
+        },
+        {
+          "range": "0.9-1.0",
+          "count": 1885,
+          "confidence": 0.96,
+          "accuracy": 0.9602,
+          "gap": 0.0002
+        }
+      ]
+    },
+    "vs_baseline": {
+      "only_a": 1929,
+      "only_b": 234,
+      "p_value": 0.0,
+      "significant": true
+    },
+    "vs_runner_up": {
+      "only_a": 74,
+      "only_b": 59,
+      "p_value": 0.22462992985836275,
+      "significant": false
+    },
+    "slices": {
+      "city": [
+        {
+          "group": "新潟",
+          "count": 465,
+          "accuracy": 0.7870967741935484,
+          "macro_f1": 0.7683449426023682
+        },
+        {
+          "group": "名古屋",
+          "count": 445,
+          "accuracy": 0.7932584269662921,
+          "macro_f1": 0.7881235333866913
+        },
+        {
+          "group": "大阪",
+          "count": 464,
+          "accuracy": 0.8017241379310345,
+          "macro_f1": 0.799904017620916
+        },
+        {
+          "group": "仙台",
+          "count": 390,
+          "accuracy": 0.8051282051282052,
+          "macro_f1": 0.803266985605103
+        },
+        {
+          "group": "東京",
+          "count": 428,
+          "accuracy": 0.8177570093457944,
+          "macro_f1": 0.8184219573036441
+        },
+        {
+          "group": "高知",
+          "count": 440,
+          "accuracy": 0.8227272727272728,
+          "macro_f1": 0.7917689925840493
+        },
+        {
+          "group": "札幌",
+          "count": 439,
+          "accuracy": 0.8291571753986332,
+          "macro_f1": 0.8260450292129738
+        },
+        {
+          "group": "福岡",
+          "count": 447,
+          "accuracy": 0.8344519015659956,
+          "macro_f1": 0.8181450707649501
+        },
+        {
+          "group": "那覇",
+          "count": 428,
+          "accuracy": 0.866822429906542,
+          "macro_f1": 0.6904712031012944
+        }
+      ],
+      "season": [
+        {
+          "group": "夏",
+          "count": 984,
+          "accuracy": 0.8048780487804879,
+          "macro_f1": 0.7396672145456931
+        },
+        {
+          "group": "冬",
+          "count": 959,
+          "accuracy": 0.8102189781021898,
+          "macro_f1": 0.7633859659042718
+        },
+        {
+          "group": "春",
+          "count": 1013,
+          "accuracy": 0.8232971372161896,
+          "macro_f1": 0.7999996606465363
+        },
+        {
+          "group": "秋",
+          "count": 990,
+          "accuracy": 0.8303030303030303,
+          "macro_f1": 0.768777673573544
+        }
+      ]
+    }
+  },
+  "holdout_metrics": {
+    "accuracy": {
+      "value": 0.821142750790992,
+      "low": 0.8110878466406105,
+      "high": 0.8304531918853527
+    },
+    "macro_f1": {
+      "value": 0.8184310352216175,
+      "low": 0.8083071642414671,
+      "high": 0.8278142024584727
+    },
+    "confusion_matrix": [
+      [
+        1658,
+        113,
+        198
+      ],
+      [
+        80,
+        1515,
+        168
+      ],
+      [
+        191,
+        211,
+        1239
+      ]
+    ],
+    "log_loss": 0.44908053863372943,
+    "bayes_accuracy": 0.8287599800735237,
+    "rows": 5373,
+    "date_from": "2025-01-01",
+    "date_to": "2026-08-20",
+    "calibration": {
+      "ece": 0.00744044402449918,
+      "bins": [
+        {
+          "range": "0.3-0.4",
+          "count": 15,
+          "confidence": 0.3812,
+          "accuracy": 0.3333,
+          "gap": -0.0479
+        },
+        {
+          "range": "0.4-0.5",
+          "count": 243,
+          "confidence": 0.4687,
+          "accuracy": 0.4527,
+          "gap": -0.016
+        },
+        {
+          "range": "0.5-0.6",
+          "count": 500,
+          "confidence": 0.5504,
+          "accuracy": 0.512,
+          "gap": -0.0384
+        },
+        {
+          "range": "0.6-0.7",
+          "count": 537,
+          "confidence": 0.6511,
+          "accuracy": 0.6462,
+          "gap": -0.0049
+        },
+        {
+          "range": "0.7-0.8",
+          "count": 612,
+          "confidence": 0.7515,
+          "accuracy": 0.7435,
+          "gap": -0.0081
+        },
+        {
+          "range": "0.8-0.9",
+          "count": 816,
+          "confidence": 0.8571,
+          "accuracy": 0.8468,
+          "gap": -0.0103
+        },
+        {
+          "range": "0.9-1.0",
+          "count": 2650,
+          "confidence": 0.9615,
+          "accuracy": 0.9615,
+          "gap": 0.0001
+        }
+      ]
     }
   },
   "permutation_importance": {
@@ -171,11 +535,14 @@
       "std": 0.0019074895042181126
     }
   },
+  "version": "v1",
+  "git_sha": "f4c1853",
   "environment": {
     "python": "3.13.14",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
     "scikit_learn": "1.9.0",
     "numpy": "2.5.2",
-    "pandas": "3.0.5",
+    "pandas": "2.3.3",
     "joblib": "1.5.3"
   }
 }

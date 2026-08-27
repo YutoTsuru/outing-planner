@@ -1,20 +1,20 @@
 """
-お出かけプランナー：モデル学習スクリプト
+お出かけプランナー：カテゴリ予測モデルの学習スクリプト
 
 実測の気象データ（気温・降水確率・風速・湿度）から、
-おすすめのお出かけカテゴリ（outdoor / indoor / relax）を予測する
-機械学習モデルを学習して保存します。
+おすすめのお出かけカテゴリ（outdoor / indoor / relax）を予測するモデルを作ります。
 
-このスクリプトがやることは4つです。
+このスクリプトは、単に学習して保存するだけではありません。
+本番で使うモデルに必要な確認を、順番にすべて行います。
 
-    1. 気象データ（data/weather_jp.csv）を読み込む
-       …無ければ Open-Meteo から自動でダウンロードします
-    2. 「おすすめ度モデル」で1日ごとに正解ラベルを付ける
-    3. 5つの候補（ものさし1つ＋機械学習4つ）を比べて、いちばん良いものを選ぶ
-    4. 選んだモデルを学習して model/outing_model.pkl に保存する
-       あわせて、成績表を model/model_card.json に書き出す
-
-くわしい説明（どんなモデルなのか・成績・限界）は doc/README.md にあります。
+    1. データを検証する（列・型・範囲・重複・欠測）
+    2. 正解ラベルを作る（おすすめ度モデル＋抽選）
+    3. 候補5つを交差検証で比べ、いちばん良いものを選ぶ
+    4. 確率の質（較正）を確かめ、必要なら較正しなおす
+    5. 評価用データで、信頼区間つきの成績を出す
+    6. 都市別・季節別の内訳を見て、苦手なところを探す
+    7. 学習後に一度も見ていない「未来のデータ」で最終確認する
+    8. 特徴量・データの指紋・コミットを付けて保存し、履歴に記録する
 
 実行方法:
     python train_model.py
@@ -22,167 +22,57 @@
 
 import json
 import os
-import platform
-from datetime import date
+from datetime import datetime, timezone
 
-import joblib
 import numpy as np
 import pandas as pd
-import sklearn
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    log_loss,
-)
+from sklearn.metrics import classification_report, log_loss
 from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-import fetch_weather
+from outing_ml import data as data_module
+from outing_ml import labeling, metrics
+from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS
+from outing_ml.registry import ModelBundle, Registry, save_bundle
 
-# 乱数の種（毎回まったく同じ結果になるように固定する）
-RANDOM_SEED = 42
+MODEL_NAME = "category-classifier"
+SEED = CONFIG.train.random_seed
 
-# 読み込み先・保存先
-DATA_PATH = fetch_weather.DATA_PATH
-MODEL_DIR = "model"
-MODEL_PATH = os.path.join(MODEL_DIR, "outing_model.pkl")
-CARD_PATH = os.path.join(MODEL_DIR, "model_card.json")
+# ほかの学習スクリプトから参照される値（互換のために残している）
+DATA_PATH = CONFIG.paths.dataset
+MODEL_DIR = CONFIG.paths.model_dir
+MODEL_PATH = CONFIG.paths.category_model
+CARD_PATH = CONFIG.paths.category_card
 
-# 特徴量の列名（app.py 側と同じ順番で使うこと）
-FEATURE_COLUMNS = ["temperature", "rain_probability", "wind_speed", "humidity"]
-
-# 予測するカテゴリ（この順番で確率が並ぶ）
-CATEGORIES = ["indoor", "outdoor", "relax"]
-
-# 評価用データの割合
-TEST_SIZE = 0.2
-
-# 交差検証の分割数
-CV_SPLITS = 5
+discomfort_index = labeling.discomfort_index
+add_labels = labeling.add_labels
+bayes_accuracy = labeling.bayes_accuracy
 
 
-# ---------------------------------------------------------------
-# 1. 正解ラベルを作る（おすすめ度モデル）
-# ---------------------------------------------------------------
-#
-# 気象データには「その日どこへ行くべきか」の正解は入っていません。
-# そこで、天気から3カテゴリの「おすすめ度」を計算するルールを決めて、
-# それを正解ラベルのかわりにします（弱教師あり学習と呼ばれる作り方）。
-#
-# ルールをそのまま使うと正解が1つに決まってしまい、モデルは
-# ルールを丸暗記するだけになります。そこで、おすすめ度を確率に直してから
-# ラベルを抽選します。こうすると「どちらとも言える日」がまざるので、
-# 実際の予測に近い、歯ごたえのある問題になります。
-
-# 抽選のばらつき。小さいほど迷いがなくなり、大きいほど迷う日が増える
-SOFTMAX_TEMPERATURE = 0.6
-
-
-def discomfort_index(temperature, humidity):
-    """不快指数。気温と湿度から、蒸し暑さを表す指標を計算する。"""
-    return 0.81 * temperature + 0.01 * humidity * (0.99 * temperature - 14.3) + 46.3
-
-
-def outing_scores(df):
-    """1日ごとに、3カテゴリの「おすすめ度」を計算して返す。"""
-    temperature = df["temperature"].to_numpy(dtype=float)
-    rain = df["rain_probability"].to_numpy(dtype=float)
-    wind = df["wind_speed"].to_numpy(dtype=float)
-    humidity = df["humidity"].to_numpy(dtype=float)
-
-    # 風があると、同じ気温でも寒く感じる（体感温度）
-    felt_cold = temperature - 1.5 * np.sqrt(wind)
-    discomfort = discomfort_index(temperature, humidity)
-
-    # 屋外：22℃前後がいちばん快適。雨・風・蒸し暑さで下がる
-    outdoor = (
-        3.6 * np.exp(-((temperature - 22.0) ** 2) / (2 * 8.5 ** 2))
-        - 0.048 * rain
-        - 0.200 * wind
-        - 0.020 * np.maximum(0.0, humidity - 70.0)
-    )
-
-    # 屋内：雨の日と、風が強い日（4m/s をこえたぶん）に上がる
-    indoor = (
-        0.35
-        + 0.040 * rain
-        + 0.220 * np.maximum(0.0, wind - 4.0)
-    )
-
-    # リラックス：蒸し暑い日・寒い日・真夏日ほど上がる（雨の日は屋内にゆずる）
-    relax = (
-        0.80
-        + 0.050 * np.maximum(0.0, humidity - 72.0)
-        + 0.150 * np.maximum(0.0, 13.0 - felt_cold)
-        + 0.160 * np.maximum(0.0, temperature - 27.0)
-        + 0.025 * np.maximum(0.0, discomfort - 76.0)
-        - 0.008 * rain
-    )
-
-    # CATEGORIES と同じ並び順にそろえる
-    return np.column_stack([indoor, outdoor, relax])
-
-
-def scores_to_probabilities(scores):
-    """おすすめ度を、合計が1になる確率に変換する（ソフトマックス）。"""
-    scaled = scores / SOFTMAX_TEMPERATURE
-    # 大きな数の指数計算で桁があふれないよう、行ごとに最大値を引いてから計算する
-    exponent = np.exp(scaled - scaled.max(axis=1, keepdims=True))
-    return exponent / exponent.sum(axis=1, keepdims=True)
-
-
-def add_labels(df):
-    """DataFrame に、正解ラベルの列と、その日の「本当の確率」の列を足す。"""
-    probabilities = scores_to_probabilities(outing_scores(df))
-    rng = np.random.default_rng(RANDOM_SEED)
-
-    # 行ごとに、確率にしたがってカテゴリを1つ抽選する
-    draws = rng.random(len(df))
-    cumulative = probabilities.cumsum(axis=1)
-    chosen = (draws[:, None] > cumulative).sum(axis=1)
-
-    df = df.copy()
-    df["label"] = [CATEGORIES[i] for i in chosen]
-    for index, name in enumerate(CATEGORIES):
-        df[f"true_prob_{name}"] = probabilities[:, index]
-    return df
-
-
-def bayes_accuracy(df):
-    """「これ以上は当てられない」という正解率の上限を計算する。
-
-    ラベルは確率で抽選しているので、どんなに賢いモデルでも
-    いちばん確率の高いカテゴリを答えるのが精一杯です。その平均値が上限になります。
-    """
-    columns = [f"true_prob_{name}" for name in CATEGORIES]
-    return float(df[columns].to_numpy().max(axis=1).mean())
-
-
-# ---------------------------------------------------------------
-# 2. データを読み込む
-# ---------------------------------------------------------------
-
-def load_dataset():
+def load_dataset(path: str = None):
     """気象データを読み込む（無ければダウンロードする）。"""
-    if not os.path.exists(DATA_PATH):
-        print(f"   {DATA_PATH} が無いので、先にダウンロードします")
-        df = fetch_weather.download_all()
-        os.makedirs(fetch_weather.DATA_DIR, exist_ok=True)
-        df.to_csv(DATA_PATH, index=False)
+    path = path or DATA_PATH
 
-    return pd.read_csv(DATA_PATH)
+    if not os.path.exists(path):
+        print(f"   {path} が無いので、先にダウンロードします")
+        import fetch_weather
+
+        frame = fetch_weather.download_all()
+        os.makedirs(CONFIG.paths.data_dir, exist_ok=True)
+        frame.to_csv(path, index=False)
+
+    return data_module.load_dataset(path)
 
 
 # ---------------------------------------------------------------
-# 3. モデルの候補
+# モデルの候補
 # ---------------------------------------------------------------
 
 def build_candidates():
@@ -192,47 +82,38 @@ def build_candidates():
     そこからどれだけ良くなったかで、機械学習の効果を確かめます。
     """
     return {
-        "ベースライン（最多クラス）": DummyClassifier(
-            strategy="prior", random_state=RANDOM_SEED
-        ),
+        "ベースライン（最多クラス）": DummyClassifier(strategy="prior", random_state=SEED),
         "ロジスティック回帰": Pipeline(
             [
                 ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)),
+                ("clf", LogisticRegression(max_iter=1000, random_state=SEED)),
             ]
         ),
         "決定木（深さ6）": DecisionTreeClassifier(
-            max_depth=6, min_samples_leaf=20, random_state=RANDOM_SEED
+            max_depth=6, min_samples_leaf=20, random_state=SEED
         ),
         "ランダムフォレスト": RandomForestClassifier(
-            n_estimators=300,
-            min_samples_leaf=5,
-            n_jobs=-1,
-            random_state=RANDOM_SEED,
+            n_estimators=300, min_samples_leaf=5, n_jobs=-1, random_state=SEED
         ),
         "勾配ブースティング": HistGradientBoostingClassifier(
             max_iter=300,
             learning_rate=0.08,
             max_leaf_nodes=31,
             l2_regularization=1.0,
-            random_state=RANDOM_SEED,
+            random_state=SEED,
         ),
     }
 
 
 def compare_candidates(X_train, y_train):
     """交差検証で候補を比べて、成績の表（DataFrame）を返す。"""
-    cv = StratifiedKFold(n_splits=CV_SPLITS, shuffle=True, random_state=RANDOM_SEED)
+    cv = StratifiedKFold(n_splits=CONFIG.train.cv_splits, shuffle=True, random_state=SEED)
     rows = []
 
     for name, model in build_candidates().items():
         scores = cross_validate(
-            model,
-            X_train,
-            y_train,
-            cv=cv,
+            model, X_train, y_train, cv=cv,
             scoring=["accuracy", "f1_macro", "neg_log_loss"],
-            n_jobs=None,
         )
         rows.append(
             {
@@ -248,41 +129,109 @@ def compare_candidates(X_train, y_train):
 
 
 # ---------------------------------------------------------------
-# 4. 評価
+# 較正（確率の質）
 # ---------------------------------------------------------------
 
-def evaluate(model, X_test, y_test):
-    """評価用データでの成績をまとめて返す。"""
-    predicted = model.predict(X_test)
-    probabilities = model.predict_proba(X_test)
+def calibrate_if_better(base_model, X_train, y_train, X_test, y_test):
+    """確率が正直かどうかを確かめ、較正したほうが良ければ差し替える。
 
-    return {
-        "accuracy": float(accuracy_score(y_test, predicted)),
-        "macro_f1": float(f1_score(y_test, predicted, average="macro")),
-        "log_loss": float(log_loss(y_test, probabilities, labels=list(model.classes_))),
-        "confusion_matrix": confusion_matrix(
-            y_test, predicted, labels=CATEGORIES
-        ).tolist(),
-        "per_class": classification_report(
-            y_test, predicted, labels=CATEGORIES, output_dict=True, zero_division=0
+    アプリは「おすすめ度 85%」のように確率を見せることがあります。
+    そのとき、85% と言った予測が本当に85%くらい当たっていないと、
+    数字そのものが嘘になってしまいます。
+    ここでは較正前後を比べ、対数損失が小さいほうを採用します。
+    """
+    from sklearn.base import clone
+
+    plain = clone(base_model).fit(X_train, y_train)
+    plain_proba = plain.predict_proba(X_test)
+    plain_classes = list(plain.classes_)
+    plain_ece = metrics.expected_calibration_error(y_test, plain_proba, plain_classes)
+    plain_loss = float(log_loss(y_test, plain_proba, labels=plain_classes))
+
+    calibrated = CalibratedClassifierCV(
+        clone(base_model), method="isotonic", cv=CONFIG.train.cv_splits
+    ).fit(X_train, y_train)
+    calibrated_proba = calibrated.predict_proba(X_test)
+    calibrated_classes = list(calibrated.classes_)
+    calibrated_ece = metrics.expected_calibration_error(
+        y_test, calibrated_proba, calibrated_classes
+    )
+    calibrated_loss = float(
+        log_loss(y_test, calibrated_proba, labels=calibrated_classes)
+    )
+
+    use_calibrated = calibrated_loss < plain_loss
+
+    report = {
+        "before": {"ece": plain_ece["ece"], "log_loss": plain_loss,
+                   "bins": plain_ece["bins"]},
+        "after": {"ece": calibrated_ece["ece"], "log_loss": calibrated_loss,
+                  "bins": calibrated_ece["bins"]},
+        "calibrated": use_calibrated,
+        "method": "isotonic" if use_calibrated else "none",
+    }
+
+    return (calibrated if use_calibrated else plain), report
+
+
+# ---------------------------------------------------------------
+# 評価
+# ---------------------------------------------------------------
+
+def evaluate(model, X_test, y_test, frame_test, baseline_pred, runner_up_pred):
+    """評価用データでの成績を、信頼区間・内訳・確率の質までまとめて返す。"""
+    predicted = model.predict(X_test)
+    proba = model.predict_proba(X_test)
+    classes = list(model.classes_)
+
+    result = metrics.classification_metrics(y_test, predicted, proba, classes)
+    result["per_class"] = classification_report(
+        y_test, predicted, labels=CATEGORIES, output_dict=True, zero_division=0
+    )
+    result["calibration"] = metrics.expected_calibration_error(y_test, proba, classes)
+    result["vs_baseline"] = metrics.mcnemar_test(y_test, predicted, baseline_pred)
+    result["vs_runner_up"] = metrics.mcnemar_test(y_test, predicted, runner_up_pred)
+
+    seasons = metrics.season_of(frame_test["date"])
+    result["slices"] = {
+        "city": metrics.slice_report(frame_test, y_test, predicted, "city"),
+        "season": metrics.slice_report(
+            frame_test.assign(season=seasons), y_test, predicted, "season"
         ),
     }
 
+    return result
+
+
+def evaluate_holdout(model, path: str = None):
+    """学習中に一度も見ていない「未来のデータ」で最終確認する。"""
+    path = path or CONFIG.paths.holdout
+    if not os.path.exists(path):
+        return None
+
+    frame = data_module.load_dataset(path)
+    labeled = labeling.add_labels(frame)
+    X = labeled[FEATURE_COLUMNS]
+    y = labeled["label"]
+
+    predicted = model.predict(X)
+    proba = model.predict_proba(X)
+    classes = list(model.classes_)
+
+    result = metrics.classification_metrics(y, predicted, proba, classes)
+    result["bayes_accuracy"] = labeling.bayes_accuracy(labeled)
+    result["rows"] = int(len(labeled))
+    result["date_from"] = str(frame["date"].min())
+    result["date_to"] = str(frame["date"].max())
+    result["calibration"] = metrics.expected_calibration_error(y, proba, classes)
+    return result
+
 
 def feature_importances(model, X_test, y_test):
-    """どの入力が予測に効いているかを調べる（並べ替え重要度）。
-
-    ある列の値をシャッフルして、成績がどれだけ落ちるかを見る方法です。
-    どんなモデルにも同じ手順で使えます。
-    """
+    """どの入力が予測に効いているかを調べる（並べ替え重要度）。"""
     result = permutation_importance(
-        model,
-        X_test,
-        y_test,
-        n_repeats=10,
-        random_state=RANDOM_SEED,
-        scoring="f1_macro",
-        n_jobs=-1,
+        model, X_test, y_test, n_repeats=10, random_state=SEED,
+        scoring="f1_macro", n_jobs=-1,
     )
     return {
         column: {
@@ -294,135 +243,202 @@ def feature_importances(model, X_test, y_test):
 
 
 # ---------------------------------------------------------------
-# 5. 保存
-# ---------------------------------------------------------------
-
-def save_model(model):
-    """学習済みモデルをファイルに保存する。"""
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    joblib.dump(model, MODEL_PATH)
-    print(f"モデルを保存しました: {MODEL_PATH}")
-
-
-def save_model_card(card):
-    """成績や設定を JSON にまとめて保存する（doc/README.md のもとになる情報）。"""
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    with open(CARD_PATH, "w", encoding="utf-8") as file:
-        json.dump(card, file, ensure_ascii=False, indent=2)
-    print(f"モデルカードを保存しました: {CARD_PATH}")
-
-
-# ---------------------------------------------------------------
 # メイン処理
 # ---------------------------------------------------------------
 
 def main():
-    print("1. 気象データを読み込み中...")
+    print("1. 気象データを読み込み・検証中...")
     raw = load_dataset()
-    print(f"   データ件数: {len(raw)}（{raw['city'].nunique()}都市 / "
-          f"{raw['date'].min()} 〜 {raw['date'].max()}）")
+    fingerprint = data_module.dataset_fingerprint(DATA_PATH)
+    print(f"   {len(raw)} 行 / {fingerprint['cities']}都市 / "
+          f"{fingerprint['date_from']} 〜 {fingerprint['date_to']}")
+    print(f"   データの指紋（sha256）: {fingerprint['sha256'][:16]}...")
 
     print("\n2. おすすめ度モデルで正解ラベルを作成中...")
-    df = add_labels(raw)
-    label_counts = df["label"].value_counts()
-    print("   カテゴリごとの件数:")
-    print(label_counts.to_string())
-    limit = bayes_accuracy(df)
+    df = labeling.add_labels(raw)
+    counts = labeling.label_distribution(df)
+    print("   " + " / ".join(f"{name} {value}" for name, value in counts.items()))
+    limit = labeling.bayes_accuracy(df)
     print(f"   理論上の正解率の上限（ベイズ限界）: {limit:.3f}")
 
     print("\n3. 学習用と評価用に分けています（8:2）...")
     X = df[FEATURE_COLUMNS]
     y = df["label"]
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=RANDOM_SEED, stratify=y
+        X, y, test_size=CONFIG.train.test_size, random_state=SEED, stratify=y
     )
-    test_index = X_test.index
+    frame_test = df.loc[X_test.index]
     print(f"   学習用: {len(X_train)} 件 / 評価用: {len(X_test)} 件")
 
-    print(f"\n4. {CV_SPLITS}分割の交差検証で、モデルを比べています...")
+    print(f"\n4. {CONFIG.train.cv_splits}分割の交差検証で、モデルを比べています...")
     comparison = compare_candidates(X_train, y_train)
     print(comparison.to_string(index=False, float_format=lambda value: f"{value:.3f}"))
 
     best_name = comparison.iloc[0]["モデル"]
-    best_model = build_candidates()[best_name]
+    runner_up_name = comparison.iloc[1]["モデル"]
     print(f"\n   → いちばん成績が良かったモデル: {best_name}")
 
-    print("\n5. 選んだモデルを学習して、評価用データで確かめています...")
-    best_model.fit(X_train, y_train)
-    metrics = evaluate(best_model, X_test, y_test)
-    test_limit = bayes_accuracy(df.loc[test_index])
-    print(f"   正解率  : {metrics['accuracy']:.3f}（上限 {test_limit:.3f}）")
-    print(f"   マクロF1: {metrics['macro_f1']:.3f}")
-    print(f"   対数損失: {metrics['log_loss']:.3f}")
-    print("   混同行列（縦：正解 / 横：予測）:")
-    print(pd.DataFrame(
-        metrics["confusion_matrix"], index=CATEGORIES, columns=CATEGORIES
-    ).to_string())
+    print("\n5. 確率の質（較正）を確かめています...")
+    model, calibration = calibrate_if_better(
+        build_candidates()[best_name], X_train, y_train, X_test, y_test
+    )
+    print(f"   較正なし: ECE {calibration['before']['ece']:.4f} / "
+          f"対数損失 {calibration['before']['log_loss']:.4f}")
+    print(f"   較正あり: ECE {calibration['after']['ece']:.4f} / "
+          f"対数損失 {calibration['after']['log_loss']:.4f}")
+    print(f"   → {'較正あり' if calibration['calibrated'] else '較正なし'} を採用します")
 
-    print("\n6. どの入力が効いているかを調べています...")
-    importances = feature_importances(best_model, X_test, y_test)
-    for column, value in sorted(
-        importances.items(), key=lambda item: item[1]["mean"], reverse=True
-    ):
+    print("\n6. 評価用データで確かめています...")
+    baseline = build_candidates()["ベースライン（最多クラス）"].fit(X_train, y_train)
+    runner_up = build_candidates()[runner_up_name].fit(X_train, y_train)
+    test_metrics = evaluate(
+        model, X_test, y_test, frame_test,
+        baseline.predict(X_test), runner_up.predict(X_test),
+    )
+    test_limit = labeling.bayes_accuracy(frame_test)
+
+    accuracy = test_metrics["accuracy"]
+    macro_f1 = test_metrics["macro_f1"]
+    print(f"   正解率  : {accuracy['value']:.3f} "
+          f"[95%信頼区間 {accuracy['low']:.3f}〜{accuracy['high']:.3f}]（上限 {test_limit:.3f}）")
+    print(f"   マクロF1: {macro_f1['value']:.3f} "
+          f"[{macro_f1['low']:.3f}〜{macro_f1['high']:.3f}]")
+    print(f"   対数損失: {test_metrics['log_loss']:.3f} / "
+          f"ECE {test_metrics['calibration']['ece']:.4f}")
+    print(f"   ベースラインとの差: p={test_metrics['vs_baseline']['p_value']:.2e}"
+          f"（{'有意' if test_metrics['vs_baseline']['significant'] else '有意でない'}）")
+    print(f"   2位（{runner_up_name}）との差: p={test_metrics['vs_runner_up']['p_value']:.3f}"
+          f"（{'有意' if test_metrics['vs_runner_up']['significant'] else '有意でない'}）")
+
+    print("\n   混同行列（縦：正解 / 横：予測）:")
+    print(pd.DataFrame(test_metrics["confusion_matrix"],
+                       index=CATEGORIES, columns=CATEGORIES).to_string())
+
+    print("\n7. 苦手なところを探しています（都市別・季節別）...")
+    for name, rows in test_metrics["slices"].items():
+        worst, best = rows[0], rows[-1]
+        print(f"   {name:<7} 最低 {worst['group']} {worst['accuracy']:.3f} / "
+              f"最高 {best['group']} {best['accuracy']:.3f} "
+              f"（差 {best['accuracy'] - worst['accuracy']:.3f}）")
+
+    print("\n8. どの入力が効いているかを調べています...")
+    importances = feature_importances(model, X_test, y_test)
+    for column, value in sorted(importances.items(),
+                                key=lambda item: item[1]["mean"], reverse=True):
         print(f"   {column:<17} {value['mean']:.3f} ± {value['std']:.3f}")
 
-    print("\n7. 全データで学習し直して保存します...")
-    final_model = build_candidates()[best_name]
-    final_model.fit(X, y)
-    save_model(final_model)
+    print("\n9. 未来のデータ（学習中に一度も見ていない）で最終確認...")
+    holdout = evaluate_holdout(model)
+    if holdout is None:
+        print("   （data/weather_jp_holdout.csv が無いので省略しました）")
+        print("   作るには: python fetch_weather.py --holdout")
+    else:
+        print(f"   期間: {holdout['date_from']} 〜 {holdout['date_to']}"
+              f"（{holdout['rows']} 件）")
+        print(f"   正解率  : {holdout['accuracy']['value']:.3f} "
+              f"[{holdout['accuracy']['low']:.3f}〜{holdout['accuracy']['high']:.3f}]"
+              f"（上限 {holdout['bayes_accuracy']:.3f}）")
+        print(f"   マクロF1: {holdout['macro_f1']['value']:.3f} / "
+              f"ECE {holdout['calibration']['ece']:.4f}")
+        drop = accuracy["value"] - holdout["accuracy"]["value"]
+        print(f"   評価用データからの落ちこみ: {drop:+.3f}")
+
+    print("\n10. 全データで学習し直して保存します...")
+    from sklearn.base import clone
+
+    if calibration["calibrated"]:
+        final_model = CalibratedClassifierCV(
+            clone(build_candidates()[best_name]), method="isotonic",
+            cv=CONFIG.train.cv_splits,
+        ).fit(X, y)
+    else:
+        final_model = clone(build_candidates()[best_name]).fit(X, y)
+
+    feature_ranges = {
+        column: {
+            "min": float(raw[column].min()),
+            "max": float(raw[column].max()),
+            "mean": float(raw[column].mean()),
+        }
+        for column in FEATURE_COLUMNS
+    }
 
     card = {
-        "model_name": "outing-planner-category-classifier",
-        "created_at": date.today().isoformat(),
+        "model_name": MODEL_NAME,
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "task": "天気からお出かけカテゴリを当てる3クラス分類",
         "selected_model": best_name,
-        "estimator": type(
-            final_model.steps[-1][1] if isinstance(final_model, Pipeline) else final_model
-        ).__name__,
+        "runner_up": runner_up_name,
+        "estimator": type(final_model).__name__,
         "features": FEATURE_COLUMNS,
         "classes": CATEGORIES,
-        "dataset": {
-            "path": DATA_PATH,
-            "source": "Open-Meteo Historical Weather API (ERA5)",
-            "rows": int(len(df)),
-            "cities": int(raw["city"].nunique()),
-            "date_from": str(raw["date"].min()),
-            "date_to": str(raw["date"].max()),
-            "label_counts": {key: int(value) for key, value in label_counts.items()},
-            "feature_ranges": {
-                column: {
-                    "min": float(raw[column].min()),
-                    "max": float(raw[column].max()),
-                    "mean": float(raw[column].mean()),
-                }
-                for column in FEATURE_COLUMNS
-            },
-        },
+        "data": fingerprint,
+        "dataset": {"label_counts": counts, "feature_ranges": feature_ranges},
         "labeling": {
             "method": "おすすめ度モデル（ルール）＋ソフトマックス抽選による弱教師あり",
-            "softmax_temperature": SOFTMAX_TEMPERATURE,
+            "softmax_temperature": CONFIG.label.softmax_temperature,
             "bayes_accuracy_all": limit,
             "bayes_accuracy_test": test_limit,
         },
         "training": {
-            "test_size": TEST_SIZE,
-            "cv_splits": CV_SPLITS,
-            "random_seed": RANDOM_SEED,
+            "test_size": CONFIG.train.test_size,
+            "cv_splits": CONFIG.train.cv_splits,
+            "random_seed": SEED,
             "final_fit": "全データで学習し直し",
         },
         "cv_comparison": comparison.to_dict(orient="records"),
-        "test_metrics": metrics,
+        "calibration": calibration,
+        "test_metrics": test_metrics,
+        "holdout_metrics": holdout,
         "permutation_importance": importances,
-        "environment": {
-            "python": platform.python_version(),
-            "scikit_learn": sklearn.__version__,
-            "numpy": np.__version__,
-            "pandas": pd.__version__,
-            "joblib": joblib.__version__,
-        },
     }
-    save_model_card(card)
 
-    print("\n完了！ 次は python app.py でアプリを起動してください。")
+    bundle = ModelBundle(
+        estimator=final_model,
+        feature_names=FEATURE_COLUMNS,
+        model_name=MODEL_NAME,
+        version="",  # 履歴に記録したあとで入れる
+        task=card["task"],
+        classes=CATEGORIES,
+        metadata={
+            "created_at": card["created_at"],
+            "data": fingerprint,
+            "feature_ranges": feature_ranges,
+            "selected_model": best_name,
+            "calibrated": calibration["calibrated"],
+        },
+    )
+
+    entry = Registry().record(
+        model_name=MODEL_NAME,
+        artifact_path=MODEL_PATH,
+        task=card["task"],
+        metrics={
+            "test_accuracy": accuracy["value"],
+            "test_macro_f1": macro_f1["value"],
+            "test_log_loss": test_metrics["log_loss"],
+            "test_ece": test_metrics["calibration"]["ece"],
+            "holdout_accuracy": holdout["accuracy"]["value"] if holdout else None,
+            "bayes_limit": test_limit,
+        },
+        data_fingerprint=fingerprint,
+        params={"selected_model": best_name, "calibrated": calibration["calibrated"]},
+    )
+
+    bundle.version = entry["version"]
+    card["version"] = entry["version"]
+    card["git_sha"] = entry["git_sha"]
+    card["environment"] = entry["environment"]
+
+    save_bundle(MODEL_PATH, bundle)
+    print(f"   モデルを保存しました: {MODEL_PATH}（{entry['version']}）")
+
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    with open(CARD_PATH, "w", encoding="utf-8") as file:
+        json.dump(card, file, ensure_ascii=False, indent=2, default=str)
+    print(f"   モデルカードを保存しました: {CARD_PATH}")
+
+    print("\n完了！ 説明は doc/README.md にあります。")
 
 
 if __name__ == "__main__":
