@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}ドリフト監視 ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+{% set status_word = {"OK": "問題なし", "WATCH": "要観察", "ALERT": "要対応"} %}
+
+<div class="card">
+  <h2>ドリフト監視</h2>
+  <p class="lead">
+    学習に使ったデータと、いま実際に入ってきているデータを見比べています。
+    天気の傾向が変わってくると、いずれモデルの精度が落ちるので、その兆しを早めにつかむためのものです。
+  </p>
+
+  <div class="metrics">
+    <div class="metric">
+      <span class="k">総合判定</span>
+      <span class="v status-{{ report.overall | lower }}">{{ status_word[report.overall] }}</span>
+    </div>
+    <div class="metric"><span class="k">基準データ</span><span class="v">{{ report.reference_rows }} 件</span></div>
+    <div class="metric"><span class="k">比較データ</span><span class="v">{{ report.current_rows }} 件</span></div>
+  </div>
+
+  <p class="lead" style="margin:14px 0 0">{{ report.action }}</p>
+
+  {% if report.current_source == "holdout_data" %}
+  <div class="warn">{{ report.current_note }}</div>
+  {% else %}
+  <p class="lead" style="margin:6px 0 0">{{ report.current_note }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>天気4項目のずれ</h2>
+  <p class="lead">
+    PSI（母集団安定性指標）が 0.10 未満なら OK、0.10〜0.25 で要観察、0.25 以上で要対応です。
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th><th>判定</th>
+          <th class="num">PSI</th>
+          <th class="num">基準の平均</th><th class="num">いまの平均</th><th class="num">差</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.features %}
+        {% set field = fields_view | selectattr("name", "equalto", row.feature) | first %}
+        <tr>
+          <td>{{ field.label if field else row.feature }}</td>
+          <td><span class="status-{{ row.status | lower }}">{{ status_word[row.status] }}</span></td>
+          <td class="num">{{ row.psi }}</td>
+          <td class="num">{{ row.reference_mean }}{{ field.unit if field else "" }}</td>
+          <td class="num">{{ row.current_mean }}{{ field.unit if field else "" }}</td>
+          <td class="num">{{ "%+.2f" | format(row.shift) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if report.prediction %}
+<div class="card">
+  <h2>予測の内訳のずれ</h2>
+  <p class="lead">
+    入力が同じように見えても、予測の出方（outdoor が減って indoor が増えた等）が
+    変わっていれば、下流のプランづくりに影響します。
+  </p>
+
+  <div class="bars">
+    {% for name, share in report.prediction.share.items() %}
+    <div class="bar-row">
+      <span>{{ labels[name].name }}</span>
+      <span class="bar"><span style="width: {{ (share.current * 100) | round(1) }}%"></span></span>
+      <span class="num">{{ (share.reference * 100) | round(1) }}% → {{ (share.current * 100) | round(1) }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p class="lead" style="margin:14px 0 0">
+    ずれの大きさ（対称KLダイバージェンス）: {{ report.prediction.divergence }}
+    （<span class="status-{{ report.prediction.status | lower }}">{{ status_word[report.prediction.status] }}</span>）
+  </p>
+</div>
+{% endif %}
+
+<div class="card">
+  <p class="lead" style="margin:0">
+    JSON で取るなら <code>/api/monitor</code>。しきい値は
+    <code>outing_ml/config.py</code> の <code>MonitorSpec</code> で決めています。
+  </p>
+</div>
+
+{% endblock %}

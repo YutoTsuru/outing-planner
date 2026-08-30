@@ -108,6 +108,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | `/forecast?city=東京` | あしたの天気の予測（予測区間つき）と、そのおすすめ |
 | `/plan` | 時間つきのお出かけプラン（実在するスポットを探す） |
 | `/history` | これまでの予測の記録と傾向（どんな天気のときに使われたか） |
+| `/monitor` | ドリフト監視。学習データと最近の入力を見比べて、学習し直す時期かを判定 |
 | `/models` | いま動いているモデルの版・成績・学習に使ったデータの指紋 |
 
 画面の色は、見る人の設定（明るい／暗い）に合わせて切り替わります。
@@ -127,6 +128,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | GET | `/api/cities` | 翌日予報を出せる都市 |
 | GET | `/api/weather-types` | 天気タイプの一覧 |
 | GET | `/api/history` | これまでの予測の記録と傾向（`?limit=` で件数指定・1〜1000） |
+| GET | `/api/monitor` | ドリフト監視の結果（PSI・KS統計量・OK/WATCH/ALERT判定） |
 | POST | `/api/predict` | 天気4項目 → おすすめ |
 | POST | `/api/predict/batch` | まとめて予測（最大100件） |
 | GET | `/api/forecast?city=東京` | あしたの天気とおすすめ |
@@ -231,7 +233,36 @@ curl -X POST http://127.0.0.1:5000/api/predict \
 
 ---
 
-## 5. 予測の記録
+## 5. ドリフト監視
+
+`/monitor` で、学習データと「いまの入力」がどれだけずれているかを見られます。
+
+「いまの入力」には、まず実際の予測記録（`reports/predictions.jsonl`）を使います。
+ただし記録がまだ30件に満たないうちは、判定が安定しないため、学習後の未来データ
+（`data/weather_jp_holdout.csv`）で代用します。どちらを使っているかは画面に表示されます。
+
+```bash
+curl http://127.0.0.1:5000/api/monitor
+```
+
+```json
+{"ok": true, "overall": "OK", "action": "対応は不要です。",
+ "current_source": "holdout_data",
+ "current_note": "予測の記録がまだ 30 件に足りないため（現在 0 件）、学習後の未来データで代用しています。",
+ "features": [{"feature": "temperature", "psi": 0.0484, "status": "OK", "…": 0}, "…"],
+ "prediction": {"share": {"indoor": {"reference": 0.34, "current": 0.33}, "…": {}},
+                "divergence": 0.006, "status": "OK"}}
+```
+
+判定は3段階です（しきい値は `outing_ml/config.py` の `MonitorSpec`）。
+
+| 判定 | PSI | 対応 |
+| --- | --- | --- |
+| OK | 0.10 未満 | 対応不要 |
+| WATCH | 0.10〜0.25 | しばらく様子を見る。連続してWATCHが出たら再学習を検討 |
+| ALERT | 0.25 以上 | `python train_all.py` での学習し直しを検討 |
+
+## 6. 予測の記録
 
 予測するたびに `reports/predictions.jsonl` へ1行ずつ残します（JSON Lines・追記のみ）。
 
@@ -278,7 +309,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 6. つまずいたら
+## 7. つまずいたら
 
 | 症状 | 原因と直し方 |
 | --- | --- |
@@ -291,7 +322,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 7. Gradio 版（app.py）との違い
+## 8. Gradio 版（app.py）との違い
 
 | | Gradio（`app.py`） | Flask（`webapp.py`） |
 | --- | --- | --- |

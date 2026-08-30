@@ -12,6 +12,8 @@ import os
 from collections import Counter, deque
 from datetime import UTC, datetime
 
+import pandas as pd
+
 from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS
 
 # 1行1件の JSON Lines。追記しかしない
@@ -136,3 +138,20 @@ def summarize(entries: list[dict]) -> dict:
         "average_confidence": round(sum(confidences) / len(confidences), 4)
         if confidences else None,
     }
+
+
+def weather_frame(entries: list[dict]) -> pd.DataFrame:
+    """記録から、天気4項目だけの表を作る（ドリフト監視で使う）。
+
+    predict 系の記録は "input"、forecast 系の記録は "weather" というキーに
+    天気が入っている。どちらも同じ4項目なので、ここで1つの表にそろえる。
+    """
+    rows = []
+    for entry in entries:
+        weather = entry.get("input") or entry.get("weather")
+        if not weather:
+            continue
+        if all(isinstance(weather.get(column), (int, float)) for column in FEATURE_COLUMNS):
+            rows.append({column: float(weather[column]) for column in FEATURE_COLUMNS})
+
+    return pd.DataFrame(rows, columns=FEATURE_COLUMNS)

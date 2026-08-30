@@ -25,6 +25,7 @@ from flask import Blueprint, Flask, redirect, render_template, request, url_for
 
 import api as api_module
 import geocoding
+import monitoring
 import prediction_log
 import presentation
 from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS
@@ -200,6 +201,17 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         )
         return render_template("plan.html", area=area_name, category=category,
                                plan_text=text, labels=presentation.label_views())
+
+    @web.get("/monitor")
+    def monitor_page():
+        try:
+            report = monitoring.monitor_report()
+        except monitoring.MonitorUnavailableError as error:
+            raise WebError(str(error), 503) from error
+
+        return render_template("monitor.html", report=report,
+                               labels=presentation.label_views(),
+                               fields_view=presentation.weather_fields())
 
     @web.get("/history")
     def history_page():

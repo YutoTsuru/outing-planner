@@ -204,3 +204,12 @@ def test_予測すると記録の画面に出る(client):
 @needs_models
 def test_記録の件数指定が数値でなければ断る(client):
     assert client.get("/history?limit=たくさん").status_code == 400
+
+
+@needs_models
+def test_監視画面が表示される(client):
+    body = text_of(client.get("/monitor"))
+
+    assert "ドリフト監視" in body
+    assert "総合判定" in body
+    assert "天気4項目のずれ" in body
