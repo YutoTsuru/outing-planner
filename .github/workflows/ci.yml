@@ -2,7 +2,7 @@ name: CI
 
 # 目的：main に入るコードが「読める・動く・学習できる」ことを毎回機械で確かめる。
 #   1. lint    … 書き方のばらつきと、明らかな間違いを弾く
-#   2. test    … 55件のテスト（データ検証・ラベル・特徴量・評価・推論・監視）
+#   2. test    … データ検証・ラベル・特徴量・評価・推論・監視・Web画面・APIのテスト
 #   3. smoke   … 少量のデータで学習が最後まで通ることを確かめる
 #
 # 学習そのもの（本番のモデル作成）は CI では回しません。
@@ -35,7 +35,7 @@ jobs:
           pip install pandas numpy scikit-learn joblib requests flask pytest ruff openapi-spec-validator
 
       - name: lint（ruff）
-        run: ruff check outing_ml tests scripts train_*.py fetch_weather.py app.py api.py webapp.py geocoding.py presentation.py
+        run: ruff check outing_ml tests scripts train_*.py fetch_weather.py api.py webapp.py geocoding.py presentation.py
 
       - name: テスト
         run: pytest tests -q

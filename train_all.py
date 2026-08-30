@@ -46,7 +46,7 @@ def main():
     print(f"  すべて完了しました（{time.time() - started:.0f} 秒）")
     print("=" * 60)
     print("\nモデルの説明は doc/README.md にまとめてあります。")
-    print("次は python app.py でアプリを起動してください。")
+    print("次は python webapp.py でアプリを起動してください。")
 
 
 if __name__ == "__main__":

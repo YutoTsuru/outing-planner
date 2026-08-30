@@ -61,3 +61,25 @@ def test_どちらでも見つからなければ分かるエラーにする(monk
     with pytest.raises(geocoding.AreaNotFoundError) as error:
         geocoding.resolve_area("ありえない地名")
     assert "ありえない地名" in str(error.value)
+
+
+def test_現在地はGoogleMapsが使えればそちらを使う(monkeypatch):
+    monkeypatch.setattr(maps_api, "reverse_geocode", lambda lat, lon: "東京都新宿区")
+    monkeypatch.setattr(osm_api, "reverse_geocode",
+                        lambda lat, lon: pytest.fail("Google が使えるのに切り替わった"))
+
+    assert geocoding.resolve_gps(35.6895, 139.6917) == "東京都新宿区"
+
+
+def test_現在地はGoogleMapsがNoneならOpenStreetMapに切り替える(monkeypatch):
+    monkeypatch.setattr(maps_api, "reverse_geocode", lambda lat, lon: None)
+    monkeypatch.setattr(osm_api, "reverse_geocode", lambda lat, lon: "京都府京都市")
+
+    assert geocoding.resolve_gps(35.0, 135.7) == "京都府京都市"
+
+
+def test_現在地はどちらも失敗したら現在地周辺にする(monkeypatch):
+    monkeypatch.setattr(maps_api, "reverse_geocode", lambda lat, lon: None)
+    monkeypatch.setattr(osm_api, "reverse_geocode", lambda lat, lon: None)
+
+    assert geocoding.resolve_gps(0.0, 0.0) == "現在地周辺"

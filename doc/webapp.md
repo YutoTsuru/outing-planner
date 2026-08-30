@@ -1,8 +1,7 @@
 # 🌐 Web アプリと REST API ｜ 使い方
 
 `webapp.py`（Flask）は、**画面**と **REST API** を1つのサーバで動かします。
-Gradio 版（`app.py`）と同じモデル・同じ文言を使っていて、違うのは見た目だけです。
-予測はどちらも [`outing_ml/serve.py`](../outing_ml/serve.py) を通るので、入力の検証も同じように効きます。
+予測はすべて [`outing_ml/serve.py`](../outing_ml/serve.py) を通るので、入力の検証も一貫して効きます。
 
 ---
 
@@ -206,6 +205,22 @@ curl http://127.0.0.1:5000/api/openapi.json | python -m json.tool
 `openapi_spec.py` も忘れずに直してください。`tests/test_openapi.py` が、
 api.py の実際のルートと仕様のパスが一致しているかを機械的に確かめます
 （載せ忘れ・消し忘れのどちらも検出します）。
+
+### 現在地からプランを作る
+
+画面の「この日のプランを作る」フォームに「現在地を使う」ボタンがあります。押すと
+ブラウザの位置情報（Geolocation API）で緯度経度を取得し、地名の入力を飛ばして
+そのままプランを作れます。位置情報は `https://` か `http://localhost` でしか
+取得できません（ブラウザの仕様）。取得した緯度経度から地名を調べるのは
+`geocoding.resolve_gps()`（Google Maps →（使えなければ）OpenStreetMap の順）です。
+
+REST API から使うときは、`area` の代わりに `latitude` / `longitude` を渡します。
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/plan \
+  -H "Content-Type: application/json" \
+  -d '{"category": "outdoor", "latitude": 35.6895, "longitude": 139.6917}'
+```
 
 ### プランを共有する
 
@@ -528,21 +543,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 12. Gradio 版（app.py）との違い
-
-| | Gradio（`app.py`） | Flask（`webapp.py`） |
-| --- | --- | --- |
-| 起動 | `python app.py` | `python webapp.py` |
-| ポート | 7860 | 5000 |
-| 画面 | 1ページで STEP 1→3 が進む | ページごとに分かれる |
-| REST API | 無い | `/api` にある |
-| 現在地の取得 | できる（ブラウザの位置情報） | 未対応（地名を入力する） |
-| Hugging Face Spaces | ここが動いている | ローカル・自前サーバ向け |
-
-モデルの読み込み・入力の検証・カテゴリの文言は、どちらも同じコードを使っています
-（[`outing_ml/serve.py`](../outing_ml/serve.py) と [`presentation.py`](../presentation.py)）。
-
-## 13. アクセシビリティ
+## 12. アクセシビリティ
 
 キーボード操作とスクリーンリーダーへの対応（スキップリンク・label の関連付け・
 表の caption・色のコントラストなど）は [doc/accessibility.md](accessibility.md)
