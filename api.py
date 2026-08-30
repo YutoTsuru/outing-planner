@@ -15,7 +15,8 @@
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
     POST /api/predict/batch   まとめて予測（最大100件）
     GET  /api/forecast        あしたの天気と、そのおすすめ
-    POST /api/plan            時間つきのお出かけプラン
+    POST /api/plan            時間つきのお出かけプラン（共有リンクも返す）
+    GET  /api/share/<id>      共有リンクからプランを取り出す
 
 実行方法:
     python api.py                 # http://127.0.0.1:5000 で起動
@@ -33,6 +34,7 @@ import geocoding
 import planner
 import prediction_log
 import rate_limit
+import shared_plans
 from monitoring import MonitorUnavailableError, monitor_report
 from openapi_spec import build_spec as build_openapi_spec
 from outing_ml import forecasting
@@ -415,8 +417,20 @@ def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> 
             start_time, end_time, radius_m=int(radius_km * 1000),
             wishes=[str(wish) for wish in wishes[:planner.MAX_WISHES]],
         )
+        plan_id = shared_plans.save(category, area_name or "指定の場所", text)
         return jsonify({"ok": True, "category": category, "area": area_name,
-                        "plan_markdown": text})
+                        "plan_markdown": text, "share_id": plan_id,
+                        "share_url": f"/share/{plan_id}"})
+
+    @api.get("/share/<plan_id>")
+    def get_shared_plan(plan_id):
+        """共有リンクからプランを取り出す。"""
+        try:
+            entry = shared_plans.find(plan_id)
+        except shared_plans.PlanNotFoundError:
+            raise ApiError("そのプランは見つかりませんでした", 404) from None
+
+        return jsonify({"ok": True, **entry})
 
     return api
 

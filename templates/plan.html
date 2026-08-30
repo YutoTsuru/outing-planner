@@ -2,11 +2,29 @@
 {% block title %}{{ area }}のプラン ｜ お出かけプランナー{% endblock %}
 {% block content %}
 
+{% if shared_view %}
+<div class="warn">共有リンクから開いたプランです。作った人とは別の端末で見ています。</div>
+{% endif %}
+
 <div class="card plan">
   <h2>{{ area }} のお出かけプラン</h2>
   <p class="lead">おすすめカテゴリ：{{ labels[category].name }}</p>
   <pre>{{ plan_text }}</pre>
 </div>
+
+{% if share_url %}
+<div class="card">
+  <h2>このプランを共有する</h2>
+  <p class="lead">このリンクを知っている人は誰でも、同じプランを見られます。</p>
+  <div class="fields">
+    <div>
+      <label for="share-url">共有リンク</label>
+      <input type="text" id="share-url" value="{{ share_url }}" readonly
+             onclick="this.select()">
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <p class="lead" style="margin:0">

@@ -166,6 +166,40 @@ def test_プランが作れる(client, monkeypatch):
 
     assert "京都府京都市" in body
     assert "テスト用のプラン" in body
+    assert "/share/" in body
+
+
+@needs_models
+def test_プランの共有リンクから同じ内容を開ける(client, monkeypatch, tmp_path):
+    import re
+
+    import geocoding
+    import planner
+    import shared_plans
+
+    # webapp.py は `import shared_plans` で同じモジュールを参照しているので、
+    # ここで STORE_PATH を差し替えれば webapp 側にも反映される
+    monkeypatch.setattr(shared_plans, "STORE_PATH", str(tmp_path / "shared_plans.jsonl"))
+    monkeypatch.setattr(geocoding, "resolve_area",
+                        lambda query: (35.0, 135.6, "京都府京都市"))
+    monkeypatch.setattr(planner, "build_plan",
+                        lambda *args, **kwargs: "### 共有用のプラン本文")
+
+    created = client.post("/plan", data={
+        "category": "outdoor", "area": "京都市",
+        "start_time": "10:00", "end_time": "15:00", "radius_km": "3",
+    })
+    share_id = re.search(r"/share/([0-9a-f]{12})", text_of(created)).group(1)
+
+    body = text_of(client.get(f"/share/{share_id}"))
+    assert "共有用のプラン本文" in body
+    assert "共有リンクから開いたプラン" in body
+
+
+@needs_models
+def test_存在しない共有リンクはエラー画面になる(client):
+    response = client.get("/share/no-such-id")
+    assert response.status_code == 404
 
 
 @needs_models

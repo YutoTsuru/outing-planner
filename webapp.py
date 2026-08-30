@@ -30,6 +30,7 @@ import geocoding
 import monitoring
 import prediction_log
 import presentation
+import shared_plans
 from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
 from outing_ml.registry import Registry
@@ -221,8 +222,25 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
             request.form.get("end_time", "17:00"),
             radius_m=radius_km * 1000,
         )
+        plan_id = shared_plans.save(category, area_name, text)
+        share_url = url_for("web.shared_plan_page", plan_id=plan_id, _external=True)
         return render_template("plan.html", area=area_name, category=category,
-                               plan_text=text, labels=presentation.label_views())
+                               plan_text=text, labels=presentation.label_views(),
+                               share_url=share_url)
+
+    @web.get("/share/<plan_id>")
+    def shared_plan_page(plan_id):
+        try:
+            entry = shared_plans.find(plan_id)
+        except shared_plans.PlanNotFoundError:
+            raise WebError("そのプランは見つかりませんでした。リンクが間違っているか、"
+                           "共有元がプランを作り直した可能性があります。", 404) from None
+
+        share_url = url_for("web.shared_plan_page", plan_id=entry["id"], _external=True)
+        return render_template("plan.html", area=entry["area"], category=entry["category"],
+                               plan_text=entry["plan_markdown"],
+                               labels=presentation.label_views(),
+                               share_url=share_url, shared_view=True)
 
     @web.get("/monitor")
     def monitor_page():

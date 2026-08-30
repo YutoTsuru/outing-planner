@@ -275,6 +275,34 @@ def test_プランが作れる(client, monkeypatch):
 
     assert body["ok"]
     assert body["plan_markdown"].startswith("### ")
+    assert body["share_id"]
+    assert body["share_url"] == f"/share/{body['share_id']}"
+
+
+@needs_models
+def test_共有リンクからプランを取り出せる(client, monkeypatch, tmp_path):
+    import api
+
+    monkeypatch.setattr(api.shared_plans, "STORE_PATH", str(tmp_path / "shared_plans.jsonl"))
+    monkeypatch.setattr(api.planner, "build_plan",
+                        lambda *args, **kwargs: "### 共有テスト用のプラン")
+
+    created = client.post("/api/plan", json={
+        "category": "outdoor", "latitude": 35.0, "longitude": 135.0,
+        "area": "テスト市", "start_time": "10:00", "end_time": "15:00",
+    }).get_json()
+
+    fetched = client.get(f"/api/share/{created['share_id']}").get_json()
+
+    assert fetched["ok"]
+    assert fetched["plan_markdown"] == "### 共有テスト用のプラン"
+    assert fetched["area"] == "テスト市"
+
+
+@needs_models
+def test_存在しない共有IDは404(client):
+    response = client.get("/api/share/no-such-id")
+    assert response.status_code == 404
 
 
 @needs_models
