@@ -46,10 +46,10 @@ class FakeForecast:
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    import api
+    import prediction_log
     import webapp
 
-    monkeypatch.setattr(api, "PREDICTION_LOG", str(tmp_path / "predictions.jsonl"))
+    monkeypatch.setattr(prediction_log, "LOG_PATH", str(tmp_path / "predictions.jsonl"))
 
     outing = OutingService.load()
     app = webapp.create_web_app(outing=outing, forecast=FakeForecast(outing))
@@ -182,3 +182,25 @@ def test_APIの無いURLはJSONで404を返す(client):
 
     assert response.status_code == 404
     assert response.get_json()["ok"] is False
+
+
+@needs_models
+def test_記録がなければ案内を出す(client):
+    body = text_of(client.get("/history"))
+
+    assert "まだ記録がありません" in body
+
+
+@needs_models
+def test_予測すると記録の画面に出る(client):
+    client.post("/predict", data=GOOD_DAY)
+
+    body = text_of(client.get("/history"))
+    assert "予測されたカテゴリの内訳" in body
+    assert "使われたときの平均の天気" in body
+    assert "web_predict" in body
+
+
+@needs_models
+def test_記録の件数指定が数値でなければ断る(client):
+    assert client.get("/history?limit=たくさん").status_code == 400

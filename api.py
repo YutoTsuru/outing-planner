@@ -8,6 +8,7 @@
     GET  /api/models          学習の履歴（版・成績・データの指紋）
     GET  /api/cities          翌日予報を出せる都市
     GET  /api/weather-types   天気タイプの一覧
+    GET  /api/history         これまでの予測の記録と傾向
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
     POST /api/predict/batch   まとめて予測（最大100件）
     GET  /api/forecast        あしたの天気と、そのおすすめ
@@ -18,16 +19,15 @@
     python app.py                 # 画面と一緒に起動（/api で同じAPIが使える）
 """
 
-import json
 import os
-from datetime import UTC, datetime
 from typing import Any
 
 from flask import Blueprint, Flask, jsonify, request
 
 import geocoding
 import planner
-from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS, INPUT_RANGES
+import prediction_log
+from outing_ml.config import CATEGORIES, FEATURE_COLUMNS, INPUT_RANGES
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
 from outing_ml.registry import Registry
 from outing_ml.serve import InvalidInputError, OutingService
@@ -35,12 +35,6 @@ from outing_ml.weather_source import UnknownCityError, city_names
 
 # まとめて予測できる最大件数（大きなリクエストでサーバを詰まらせないため）
 MAX_BATCH_SIZE = 100
-
-# 予測の記録先。実際にどんな天気で使われたかを貯めておく
-PREDICTION_LOG = os.path.join(CONFIG.paths.report_dir, "predictions.jsonl")
-
-# 記録を切りたいときは OUTING_LOG_PREDICTIONS=0
-LOG_PREDICTIONS = os.environ.get("OUTING_LOG_PREDICTIONS", "1") != "0"
 
 
 class ApiError(Exception):
@@ -96,33 +90,9 @@ def query_int(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
-# ---------------------------------------------------------------
-# 予測の記録
-# ---------------------------------------------------------------
-
 def log_prediction(kind: str, payload: dict) -> None:
-    """どんな天気で使われたかを1行ずつ残す。
-
-    いまの正解ラベルはルールから作った疑似データです（doc/README.md 第4章）。
-    実際に使われた入力を貯めておけば、いずれ本物の利用データで作り直せます。
-    記録するのは天気の数値と予測結果だけで、個人を特定できる情報は残しません。
-
-    記録に失敗しても予測は返します。記録は本筋ではないためです。
-    """
-    if not LOG_PREDICTIONS:
-        return
-
-    try:
-        os.makedirs(CONFIG.paths.report_dir, exist_ok=True)
-        line = {
-            "at": datetime.now(UTC).isoformat(timespec="seconds"),
-            "kind": kind,
-            **payload,
-        }
-        with open(PREDICTION_LOG, "a", encoding="utf-8") as file:
-            file.write(json.dumps(line, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+    """予測の記録（実装は prediction_log にある）。"""
+    prediction_log.append(kind, payload)
 
 
 # ---------------------------------------------------------------
@@ -244,9 +214,31 @@ def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> 
         except ForecastUnavailableError as error:
             raise ApiError(str(error), 503) from error
 
-        log_prediction("forecast", {"city": city, "target_date": result.target_date,
-                                    "weather": result.weather})
+        log_prediction("forecast", {
+            "city": city,
+            "target_date": result.target_date,
+            "weather": result.weather,
+            "category": result.recommendation.category if result.recommendation else None,
+            "confidence": result.recommendation.confidence if result.recommendation else None,
+        })
         return jsonify({"ok": True, **result.to_dict()})
+
+    @api.get("/history")
+    def history():
+        """これまでの予測の記録と、その傾向を返す。
+
+        どんな天気のときに使われたかが見えると、学習データの範囲と
+        実際の使われ方がずれていないかを確かめられる。
+        """
+        limit = query_int("limit", prediction_log.DEFAULT_LIMIT, 1, 1000)
+        entries = prediction_log.read_entries(limit=limit)
+
+        return jsonify({
+            "ok": True,
+            "logging_enabled": prediction_log.enabled(),
+            "summary": prediction_log.summarize(entries),
+            "entries": entries,
+        })
 
     @api.post("/plan")
     def plan():

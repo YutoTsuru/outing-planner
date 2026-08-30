@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}予測の記録 ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>予測の記録</h2>
+  <p class="lead">
+    このアプリがどんな天気のときに使われたかを残しています。
+    学習データの範囲と、実際の使われ方がずれていないかを確かめるためのものです。
+  </p>
+
+  {% if not logging_enabled %}
+  <div class="warn">記録は現在オフです（<code>OUTING_LOG_PREDICTIONS=0</code>）。</div>
+  {% endif %}
+
+  {% if summary.total == 0 %}
+  <p class="lead" style="margin:0">
+    まだ記録がありません。<a href="{{ url_for('web.index') }}">天気を入れて予測</a>すると、ここに貯まっていきます。<br>
+    保存先：<code>{{ log_path }}</code>
+  </p>
+  {% else %}
+  <div class="metrics">
+    <div class="metric"><span class="k">件数</span><span class="v">{{ summary.total }}</span></div>
+    {% if summary.average_confidence is not none %}
+    <div class="metric"><span class="k">平均の確信度</span><span class="v">{{ (summary.average_confidence * 100) | round | int }}%</span></div>
+    {% endif %}
+    {% if summary.period %}
+    <div class="metric"><span class="k">期間</span><span class="v">{{ summary.period['from'][:10] }} 〜 {{ summary.period.to[:10] }}</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if summary.total > 0 %}
+
+<div class="card">
+  <h2>予測されたカテゴリの内訳</h2>
+  <div class="bars">
+    {% for row in summary.by_category %}
+    <div class="bar-row">
+      <span>{{ labels[row.category].name }}</span>
+      <span class="bar"><span style="width: {{ (row.share * 100) | round(1) }}%"></span></span>
+      <span class="num">{{ row.count }}件</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if summary.averages %}
+  <h3>使われたときの平均の天気</h3>
+  <div class="metrics">
+    {% for field in fields_view %}
+    {% if field.name in summary.averages %}
+    <div class="metric"><span class="k">{{ field.label }}</span><span class="v">{{ summary.averages[field.name] }}{{ field.unit }}</span></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>最近の {{ entries | length }} 件</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>日時（UTC）</th><th>経路</th>
+          <th class="num">気温</th><th class="num">降水</th><th class="num">風速</th><th class="num">湿度</th>
+          <th>予測</th><th class="num">確信度</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        {% set weather = entry.get('input') or entry.get('weather') or {} %}
+        <tr>
+          <td>{{ entry.at | replace('T', ' ') | replace('+00:00', '') }}</td>
+          <td><code>{{ entry.kind }}</code></td>
+          <td class="num">{{ weather.get('temperature', '—') }}</td>
+          <td class="num">{{ weather.get('rain_probability', '—') }}</td>
+          <td class="num">{{ weather.get('wind_speed', '—') }}</td>
+          <td class="num">{{ weather.get('humidity', '—') }}</td>
+          <td>{% if entry.get('category') %}{{ labels[entry.category].name }}{% else %}—{% endif %}</td>
+          <td class="num">{% if entry.get('confidence') %}{{ (entry.confidence * 100) | round | int }}%{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="lead" style="margin:14px 0 0">
+    保存先 <code>{{ log_path }}</code> ／ JSON で取るなら <code>/api/history?limit={{ limit }}</code>
+  </p>
+</div>
+
+{% endif %}
+
+{% endblock %}

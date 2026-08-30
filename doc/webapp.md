@@ -107,6 +107,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | `/predict` | 予測結果（カテゴリ・確信度・おでかけ日和度・天気タイプ・確率の内訳） |
 | `/forecast?city=東京` | あしたの天気の予測（予測区間つき）と、そのおすすめ |
 | `/plan` | 時間つきのお出かけプラン（実在するスポットを探す） |
+| `/history` | これまでの予測の記録と傾向（どんな天気のときに使われたか） |
 | `/models` | いま動いているモデルの版・成績・学習に使ったデータの指紋 |
 
 画面の色は、見る人の設定（明るい／暗い）に合わせて切り替わります。
@@ -125,6 +126,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | GET | `/api/models` | 学習の履歴（版・成績・データの指紋） |
 | GET | `/api/cities` | 翌日予報を出せる都市 |
 | GET | `/api/weather-types` | 天気タイプの一覧 |
+| GET | `/api/history` | これまでの予測の記録と傾向（`?limit=` で件数指定・1〜1000） |
 | POST | `/api/predict` | 天気4項目 → おすすめ |
 | POST | `/api/predict/batch` | まとめて予測（最大100件） |
 | GET | `/api/forecast?city=東京` | あしたの天気とおすすめ |
@@ -231,18 +233,44 @@ curl -X POST http://127.0.0.1:5000/api/predict \
 
 ## 5. 予測の記録
 
-予測するたびに `reports/predictions.jsonl` へ1行ずつ残します。
+予測するたびに `reports/predictions.jsonl` へ1行ずつ残します（JSON Lines・追記のみ）。
 
 ```json
-{"at": "2026-08-27T14:12:03+00:00", "kind": "predict",
- "input": {"temperature": 22.0, "…": 0}, "category": "outdoor", "confidence": 0.8495}
+{"at": "2026-08-30T11:20:45+00:00", "kind": "web_predict",
+ "input": {"temperature": 22.0, "rain_probability": 10.0, "wind_speed": 2.0, "humidity": 50.0},
+ "category": "outdoor", "confidence": 0.8495}
 ```
+
+`kind` は経路を表します。`predict` / `predict_batch` / `forecast`（REST API）と
+`web_predict` / `web_forecast`（画面）の5種類です。
 
 いまの正解ラベルはルールから作った疑似データです（[doc/README.md](README.md) 第4章）。
 実際に使われた天気を貯めておけば、いずれ本物の利用データでモデルを作り直せます。
 **残すのは天気の数値と予測結果だけ**で、個人を特定できる情報は入れていません。
 
-止めたいときは環境変数で切れます。
+### 貯まった記録を見る
+
+`/history` の画面で、件数・平均の確信度・期間・カテゴリの内訳・使われたときの平均の天気と、
+最近の一覧が見られます。JSON で取るなら次のとおりです。
+
+```bash
+curl "http://127.0.0.1:5000/api/history?limit=20"
+```
+
+```json
+{"ok": true, "logging_enabled": true,
+ "summary": {"total": 3, "by_kind": {"predict": 2, "web_predict": 1},
+             "by_category": [{"category": "indoor", "count": 1, "share": 0.3333}, "…"],
+             "period": {"from": "…", "to": "…"},
+             "averages": {"temperature": 23.3, "rain_probability": 33.3},
+             "average_confidence": 0.8906},
+ "entries": ["…"]}
+```
+
+追記中のファイルを読むので最後の行が途中で切れていることがありますが、
+読めない行は飛ばすので画面は落ちません。
+
+### 記録を止める
 
 ```bash
 OUTING_LOG_PREDICTIONS=0 python webapp.py

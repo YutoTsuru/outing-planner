@@ -50,8 +50,9 @@ class FakeForecast:
 def client(tmp_path, monkeypatch):
     """予測の記録を一時フォルダへ逃がしたテスト用クライアント。"""
     import api
+    import prediction_log
 
-    monkeypatch.setattr(api, "PREDICTION_LOG", str(tmp_path / "predictions.jsonl"))
+    monkeypatch.setattr(prediction_log, "LOG_PATH", str(tmp_path / "predictions.jsonl"))
 
     outing = OutingService.load()
     app = api.create_api(outing=outing, forecast=FakeForecast(outing))
@@ -273,12 +274,49 @@ def test_無いURLとメソッド違いはJSONで返す(client):
 def test_予測を記録している(client, tmp_path):
     import json
 
-    import api
+    import prediction_log
 
     client.post("/api/predict", json=GOOD_DAY)
 
-    assert os.path.exists(api.PREDICTION_LOG), "使われた天気を残しておく"
-    with open(api.PREDICTION_LOG, encoding="utf-8") as file:
+    assert os.path.exists(prediction_log.LOG_PATH), "使われた天気を残しておく"
+    with open(prediction_log.LOG_PATH, encoding="utf-8") as file:
         line = json.loads(file.readline())
     assert line["kind"] == "predict"
     assert line["input"] == GOOD_DAY
+
+
+@needs_models
+def test_記録を履歴として取り出せる(client):
+    client.post("/api/predict", json=GOOD_DAY)
+    client.post("/api/predict", json=RAINY_DAY)
+
+    body = client.get("/api/history").get_json()
+
+    assert body["ok"]
+    assert body["logging_enabled"] is True
+    assert body["summary"]["total"] >= 2
+    assert body["entries"][0]["kind"] == "predict"
+    assert body["entries"][0]["category"] == "indoor", "新しい順に返る"
+
+
+@needs_models
+def test_履歴の件数を絞れる(client):
+    for _ in range(3):
+        client.post("/api/predict", json=GOOD_DAY)
+
+    assert len(client.get("/api/history?limit=2").get_json()["entries"]) == 2
+
+
+@needs_models
+def test_履歴の件数指定が範囲外なら断る(client):
+    assert client.get("/api/history?limit=0").status_code == 400
+    assert client.get("/api/history?limit=abc").status_code == 400
+
+
+@needs_models
+def test_記録がなくても履歴は返る(client):
+    body = client.get("/api/history").get_json()
+
+    assert body["ok"]
+    assert body["summary"]["total"] == 0
+    assert body["entries"] == []

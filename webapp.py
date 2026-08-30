@@ -25,6 +25,7 @@ from flask import Blueprint, Flask, redirect, render_template, request, url_for
 
 import api as api_module
 import geocoding
+import prediction_log
 import presentation
 from outing_ml.config import CATEGORIES, CONFIG, FEATURE_COLUMNS
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
@@ -136,8 +137,9 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         except InvalidInputError as error:
             raise WebError(str(error)) from error
 
-        api_module.log_prediction("web_predict", {"input": weather,
-                                                  "category": result.category})
+        prediction_log.append("web_predict", {"input": weather,
+                                              "category": result.category,
+                                              "confidence": result.confidence})
         return render_template("predict.html", weather=weather,
                                **result_context(result, weather))
 
@@ -156,8 +158,13 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         except ForecastUnavailableError as error:
             raise WebError(str(error), 503) from error
 
-        api_module.log_prediction("web_forecast", {"city": city,
-                                                   "target_date": result.target_date})
+        prediction_log.append("web_forecast", {
+            "city": city,
+            "target_date": result.target_date,
+            "weather": result.weather,
+            "category": result.recommendation.category if result.recommendation else None,
+            "confidence": result.recommendation.confidence if result.recommendation else None,
+        })
         return render_template("forecast.html", city=city, forecast=result,
                                **result_context(result.recommendation, result.weather))
 
@@ -193,6 +200,28 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         )
         return render_template("plan.html", area=area_name, category=category,
                                plan_text=text, labels=presentation.label_views())
+
+    @web.get("/history")
+    def history_page():
+        limit = 50
+        raw = request.args.get("limit")
+        if raw:
+            try:
+                limit = max(1, min(500, int(raw)))
+            except ValueError:
+                raise WebError("limit は数値で指定してください") from None
+
+        entries = prediction_log.read_entries(limit=limit)
+        return render_template(
+            "history.html",
+            entries=entries,
+            summary=prediction_log.summarize(entries),
+            labels=presentation.label_views(),
+            fields_view=presentation.weather_fields(),
+            logging_enabled=prediction_log.enabled(),
+            log_path=prediction_log.LOG_PATH,
+            limit=limit,
+        )
 
     @web.get("/models")
     def models_page():
