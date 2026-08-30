@@ -86,7 +86,9 @@ def test_学習の履歴が取れる(client):
 
 @needs_models
 def test_都市と天気タイプの一覧が取れる(client):
-    assert len(client.get("/api/cities").get_json()["cities"]) == 9
+    from outing_ml.config import CONFIG
+
+    assert len(client.get("/api/cities").get_json()["cities"]) == len(CONFIG.data.cities)
 
     types = client.get("/api/weather-types").get_json()["types"]
     assert len(types) >= 3
