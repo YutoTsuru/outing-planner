@@ -332,3 +332,43 @@ def test_ドリフト監視のレポートが返る(client):
     assert body["overall"] in ("OK", "WATCH", "ALERT")
     assert len(body["features"]) == 4
     assert "current_source" in body
+
+
+@needs_models
+def test_都市比較のランキングが返る(client, monkeypatch):
+    import api
+
+    def fake_get_comparison(service, force_refresh=False):
+        return {
+            "rankings": [
+                {"city": "那覇", "target_date": "2026-08-31",
+                 "weather": {"temperature": 28.0, "rain_probability": 5.0,
+                            "wind_speed": 3.0, "humidity": 60.0},
+                 "category": "outdoor", "comfort_score": 90.0,
+                 "weather_type_name": "過ごしやすい晴れの日", "confidence": 0.8},
+            ],
+            "errors": [], "fetched_at": 0.0, "ttl_seconds": 1800, "cache_age_seconds": 0,
+        }
+
+    monkeypatch.setattr(api.city_comparison, "get_comparison", fake_get_comparison)
+
+    body = client.get("/api/compare").get_json()
+    assert body["ok"]
+    assert body["rankings"][0]["city"] == "那覇"
+
+
+@needs_models
+def test_都市比較で強制更新を渡せる(client, monkeypatch):
+    import api
+
+    captured = {}
+
+    def fake_get_comparison(service, force_refresh=False):
+        captured["force_refresh"] = force_refresh
+        return {"rankings": [], "errors": [], "fetched_at": 0.0,
+               "ttl_seconds": 1800, "cache_age_seconds": 0}
+
+    monkeypatch.setattr(api.city_comparison, "get_comparison", fake_get_comparison)
+
+    client.get("/api/compare?refresh=1")
+    assert captured["force_refresh"] is True
