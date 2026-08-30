@@ -9,6 +9,7 @@
     GET  /api/cities          翌日予報を出せる都市
     GET  /api/weather-types   天気タイプの一覧
     GET  /api/history         これまでの予測の記録と傾向
+    GET  /api/openapi.json    このAPIの仕様（OpenAPI 3.0）
     GET  /api/monitor         学習データと最近の入力のずれ（ドリフト監視）
     GET  /api/compare         全都市のあしたの予報を日和度が高い順に比較
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
@@ -31,6 +32,7 @@ import geocoding
 import planner
 import prediction_log
 from monitoring import MonitorUnavailableError, monitor_report
+from openapi_spec import build_spec as build_openapi_spec
 from outing_ml import forecasting
 from outing_ml.config import CATEGORIES, FEATURE_COLUMNS, INPUT_RANGES
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
@@ -107,6 +109,11 @@ def log_prediction(kind: str, payload: dict) -> None:
 def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> Blueprint:
     """API のルートをまとめた Blueprint を作る。"""
     api = Blueprint("api", __name__)
+
+    @api.get("/openapi.json")
+    def openapi_json():
+        """このAPIの仕様（OpenAPI 3.0）を返す。"""
+        return jsonify(build_openapi_spec())
 
     @api.get("/health")
     def health():
