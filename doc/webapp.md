@@ -112,6 +112,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | `/monitor` | ドリフト監視。学習データと最近の入力を見比べて、学習し直す時期かを判定 |
 | `/compare` | 全都市の、あしたの日和度を高い順に比較 |
 | `/models` | いま動いているモデルの版・成績・学習に使ったデータの指紋 |
+| `/docs` | REST API の仕様を Swagger UI で見る（試しに叩ける） |
 
 画面の色は、見る人の設定（明るい／暗い）に合わせて切り替わります。
 
@@ -137,6 +138,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | GET | `/api/forecast?city=東京` | あしたの天気とおすすめ |
 | GET | `/api/week?city=東京` | 数日先まで（`?days=`で1〜7）の天気とおすすめ（再帰予測） |
 | POST | `/api/plan` | 時間つきのお出かけプラン |
+| GET | `/api/openapi.json` | このAPIの仕様（OpenAPI 3.0） |
 
 ### 予測する
 
@@ -186,6 +188,22 @@ curl "http://127.0.0.1:5000/api/forecast?city=%E6%9D%B1%E4%BA%AC"   # 東京
  "interval": {"temperature": {"low": 28.1, "high": 31.6}, "…": {}},
  "recommendation": {"category": "indoor", "…": {}}}
 ```
+
+### API仕様（OpenAPI / Swagger UI）
+
+このAPIの仕様は `/api/openapi.json`（OpenAPI 3.0）で取れます。ブラウザで見るなら
+`/docs`（Swagger UI）を開くと、各エンドポイントを画面から試せます。
+
+```bash
+curl http://127.0.0.1:5000/api/openapi.json | python -m json.tool
+```
+
+仕様は `openapi_spec.py` に手で書いています。api.py のルートを自動で読み取って
+生成する仕組みにはしていません（Flask のルート定義からは、受け付ける入力の形や
+エラー時の返り値までは読み取れないため）。エンドポイントを追加・変更したら、
+`openapi_spec.py` も忘れずに直してください。`tests/test_openapi.py` が、
+api.py の実際のルートと仕様のパスが一致しているかを機械的に確かめます
+（載せ忘れ・消し忘れのどちらも検出します）。
 
 ### 数日先まで見る
 

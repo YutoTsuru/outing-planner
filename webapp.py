@@ -267,6 +267,11 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
             limit=limit,
         )
 
+    @web.get("/docs")
+    def api_docs():
+        """REST API の仕様を Swagger UI で見る画面。"""
+        return render_template("api_docs.html")
+
     @web.get("/models")
     def models_page():
         return render_template("models.html", health=outing.health(),
