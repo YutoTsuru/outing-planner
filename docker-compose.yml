@@ -1,0 +1,29 @@
+# お出かけプランナー（Flask版）をローカルで動かす。
+#
+# 使い方:
+#   docker compose up --build
+#   → http://localhost:5000/ （画面）
+#   → http://localhost:5000/docs （API仕様）
+#
+# 止める:
+#   docker compose down
+services:
+  webapp:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      # 予測のたびに reports/predictions.jsonl へ記録するかどうか（既定は記録する）
+      OUTING_LOG_PREDICTIONS: "1"
+      # アクセスログを標準出力へ1行1JSONで出すかどうか（既定は出す）
+      OUTING_ACCESS_LOG: "1"
+    volumes:
+      # 予測の記録は、コンテナを作り直しても消えないようにホスト側に残す
+      - ./reports:/app/reports
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request as u; u.urlopen('http://localhost:5000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

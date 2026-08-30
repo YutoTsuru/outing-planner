@@ -365,7 +365,48 @@ OUTING_ACCESS_LOG=0 python webapp.py
 `127.0.0.1 - - [日付] "GET /api/health" 200 -` という行は、これとは別に出続けます
 （人が読む用にそのまま残しています）。
 
-## 8. 都市を比べる
+## 8. Docker で動かす
+
+`docker compose` で、依存のインストールから起動までを1コマンドにまとめられます。
+
+```bash
+docker compose up --build
+```
+
+- 画面：<http://localhost:5000/>
+- API仕様（Swagger UI）：<http://localhost:5000/docs>
+
+止めるときは別のターミナルで `docker compose down`。
+
+### イメージの中身
+
+`Dockerfile` は `python:3.11-slim` をベースに、依存関係を入れてから
+`gunicorn` で `webapp.py`（Flask版）を起動します。学習済みモデル（`model/`）と
+学習データ（`data/`）は git 管理されているものをそのままイメージへ入れており、
+**コンテナ起動時に学習し直すことはしません**。モデルを作り直したいときは、
+手元で `python train_all.py` を実行してからイメージを作り直してください。
+
+`HEALTHCHECK` が30秒ごとに `/api/health` を確認します。`docker compose ps` の
+`STATUS` 列が `healthy` になっていれば起動できています。
+
+### 予測の記録を残す
+
+`docker-compose.yml` は `reports/` をホスト側とコンテナ側で共有するボリュームに
+しています。コンテナを作り直しても、これまでの予測の記録（`reports/predictions.jsonl`）
+は消えません。
+
+### 設定を変える
+
+`docker-compose.yml` の `environment` で `OUTING_LOG_PREDICTIONS` /
+`OUTING_ACCESS_LOG` を切り替えられます。ポートを変えたいときは
+`ports` の左側（ホスト側）の数字を書き換えてください
+（例：`"8000:5000"` にすると `http://localhost:8000/`）。
+
+> macOS では、AirPlay 受信機能などが既定でポート5000を使っていることがあります。
+> `docker compose up` が `address already in use` で失敗したら、上のようにポートを
+> 変えるか、システム設定でAirPlay受信をオフにしてください。
+
+## 9. 都市を比べる
 
 `/compare` で、47都市すべての「あしたの日和度」を高い順に並べて見られます。
 どの都市も同じ翌日予測モデルとカテゴリ予測モデルを使っています。
@@ -405,7 +446,7 @@ curl http://127.0.0.1:5000/api/compare
 一部の都市だけ取得に失敗しても（例：取得元が一時的に応答しない）、
 その都市は `errors` に理由が入り、残りの都市のランキングは表示されます。
 
-## 9. 予測の記録
+## 10. 予測の記録
 
 予測するたびに `reports/predictions.jsonl` へ1行ずつ残します（JSON Lines・追記のみ）。
 
@@ -452,7 +493,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 10. つまずいたら
+## 11. つまずいたら
 
 | 症状 | 原因と直し方 |
 | --- | --- |
@@ -461,12 +502,13 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 | `/api/forecast` が 400 になる | `curl` で日本語をそのまま URL に入れている。`%E6%9D%B1%E4%BA%AC` のようにエンコードする |
 | プラン作成が遅い | OpenStreetMap の利用ルール（1秒に1回）を守って待っているため。2回目以降はキャッシュが効いて速い |
 | `/compare` の初回表示が遅い | 47都市ぶんを順番に取得しているため（数十秒）。2回目以降は30分間キャッシュが効く |
+| `docker compose up` が `address already in use` で失敗する | macOSのAirPlay受信機能などがポート5000を使っていることがある。`docker-compose.yml` のポートを変える |
 | 地名が見つからない | Google Maps のキーが無くても動くが、`京都市` のように市区町村名で入れるほうが当たりやすい |
 | 画面は出るが予測でエラー | `model/` の `.pkl` が古い可能性。`python train_all.py` で作り直す |
 
 ---
 
-## 11. Gradio 版（app.py）との違い
+## 12. Gradio 版（app.py）との違い
 
 | | Gradio（`app.py`） | Flask（`webapp.py`） |
 | --- | --- | --- |

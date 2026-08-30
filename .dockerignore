@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+reports/
+google_maps_api_key.txt
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
