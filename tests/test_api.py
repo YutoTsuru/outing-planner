@@ -322,3 +322,13 @@ def test_記録がなくても履歴は返る(client):
     assert body["ok"]
     assert body["summary"]["total"] == 0
     assert body["entries"] == []
+
+
+@needs_models
+def test_ドリフト監視のレポートが返る(client):
+    body = client.get("/api/monitor").get_json()
+
+    assert body["ok"]
+    assert body["overall"] in ("OK", "WATCH", "ALERT")
+    assert len(body["features"]) == 4
+    assert "current_source" in body

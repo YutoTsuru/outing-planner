@@ -9,6 +9,7 @@
     GET  /api/cities          翌日予報を出せる都市
     GET  /api/weather-types   天気タイプの一覧
     GET  /api/history         これまでの予測の記録と傾向
+    GET  /api/monitor         学習データと最近の入力のずれ（ドリフト監視）
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
     POST /api/predict/batch   まとめて予測（最大100件）
     GET  /api/forecast        あしたの天気と、そのおすすめ
@@ -27,6 +28,7 @@ from flask import Blueprint, Flask, jsonify, request
 import geocoding
 import planner
 import prediction_log
+from monitoring import MonitorUnavailableError, monitor_report
 from outing_ml.config import CATEGORIES, FEATURE_COLUMNS, INPUT_RANGES
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
 from outing_ml.registry import Registry
@@ -222,6 +224,16 @@ def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> 
             "confidence": result.recommendation.confidence if result.recommendation else None,
         })
         return jsonify({"ok": True, **result.to_dict()})
+
+    @api.get("/monitor")
+    def get_monitor():
+        """学習データと最近の入力を比べて、そろそろ学習し直したほうがよいかを見る。"""
+        try:
+            report = monitor_report()
+        except MonitorUnavailableError as error:
+            raise ApiError(str(error), 503) from error
+
+        return jsonify({"ok": True, **report})
 
     @api.get("/history")
     def history():

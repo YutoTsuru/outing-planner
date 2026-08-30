@@ -165,3 +165,13 @@ footer.site a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
 }
+
+.status-ok { color: #1a7a4c; font-weight: 700; }
+.status-watch { color: #a6740a; font-weight: 700; }
+.status-alert { color: #b0342d; font-weight: 700; }
+
+@media (prefers-color-scheme: dark) {
+    .status-ok { color: #4fd393; }
+    .status-watch { color: #f2c14e; }
+    .status-alert { color: #ff8a80; }
+}
