@@ -47,6 +47,7 @@ Python授業用のサンプルとして、機械学習（scikit-learn）・Web�
 | --- | --- | --- |
 | Gradio（`app.py`） | `python app.py` → :7860 | 1ページで STEP 1→3。現在地の取得ができる。Hugging Face Spaces で動いているのはこちら |
 | Flask（`webapp.py`） | `python webapp.py` → :5000 | ページごとに分かれた画面 ＋ `/api` の REST API |
+| Docker（`docker compose`） | `docker compose up --build` → :5000 | Flask版をコンテナで動かす（依存のインストール不要） |
 
 REST API では、予測・まとめて予測・あしたの予報・プラン作成を JSON で扱えます。
 
