@@ -294,7 +294,42 @@ curl http://127.0.0.1:5000/api/monitor
 | WATCH | 0.10〜0.25 | しばらく様子を見る。連続してWATCHが出たら再学習を検討 |
 | ALERT | 0.25 以上 | `python train_all.py` での学習し直しを検討 |
 
-## 6. 都市を比べる
+## 6. レート制限
+
+すべての `/api` エンドポイントに、IPアドレス単位で1分あたりの上限を設けています。
+超えると `429 Too Many Requests` を返します。
+
+| エンドポイント | 上限（1分あたり） |
+| --- | --- |
+| `/api/health` `/api/openapi.json` | 制限なし |
+| `/api/forecast` | 20 |
+| `/api/week` | 15 |
+| `/api/compare` | 30 |
+| `/api/compare?refresh=1`（強制更新） | **2**（上の30とは別枠） |
+| `/api/plan` | 20 |
+| そのほか（`/api/predict` など） | 60（既定） |
+
+`forecast` `week` `compare` `plan` は外部（Open-Meteo・OpenStreetMap・Google Maps）へ
+通信するため、計算だけで完結する `predict` などより低くしています。
+`/api/compare?refresh=1` は30分キャッシュを無視して47都市ぶんを取得し直す重い操作なので、
+通常の上限とは別に、もっと厳しい上限を重ねてかけています。
+
+成功したレスポンスにも `X-RateLimit-Limit` / `X-RateLimit-Remaining` ヘッダーが付きます。
+429のときは `Retry-After`（あと何秒待てば良いか）が付きます。
+
+```bash
+curl -i -X POST http://127.0.0.1:5000/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{"temperature": 22, "rain_probability": 10, "wind_speed": 2, "humidity": 50}'
+# X-RateLimit-Limit: 60
+# X-RateLimit-Remaining: 59
+```
+
+実装は `rate_limit.py`（固定窓カウンタ）。外部ライブラリは使っていません。
+プロセス内のメモリだけで数えるため、`gunicorn --workers 2` のように複数
+ワーカーで動かすと、ワーカーごとに別々に数えます（1ワーカーあたりの上限になります）。
+
+## 7. 都市を比べる
 
 `/compare` で、47都市すべての「あしたの日和度」を高い順に並べて見られます。
 どの都市も同じ翌日予測モデルとカテゴリ予測モデルを使っています。
@@ -334,7 +369,7 @@ curl http://127.0.0.1:5000/api/compare
 一部の都市だけ取得に失敗しても（例：取得元が一時的に応答しない）、
 その都市は `errors` に理由が入り、残りの都市のランキングは表示されます。
 
-## 7. 予測の記録
+## 8. 予測の記録
 
 予測するたびに `reports/predictions.jsonl` へ1行ずつ残します（JSON Lines・追記のみ）。
 
@@ -381,7 +416,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 8. つまずいたら
+## 9. つまずいたら
 
 | 症状 | 原因と直し方 |
 | --- | --- |
@@ -395,7 +430,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 9. Gradio 版（app.py）との違い
+## 10. Gradio 版（app.py）との違い
 
 | | Gradio（`app.py`） | Flask（`webapp.py`） |
 | --- | --- | --- |
