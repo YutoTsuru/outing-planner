@@ -25,12 +25,13 @@
 import os
 from typing import Any
 
-from flask import Blueprint, Flask, jsonify, request
+from flask import Blueprint, Flask, g, jsonify, request
 
 import city_comparison
 import geocoding
 import planner
 import prediction_log
+import rate_limit
 from monitoring import MonitorUnavailableError, monitor_report
 from openapi_spec import build_spec as build_openapi_spec
 from outing_ml import forecasting
@@ -106,9 +107,86 @@ def log_prediction(kind: str, payload: dict) -> None:
 # ルート
 # ---------------------------------------------------------------
 
+# エンドポイントごとの1分あたりの上限。載っていないものは DEFAULT_LIMIT_PER_MINUTE。
+#
+# forecast/week/compare/plan は外部（Open-Meteo・OpenStreetMap・Google Maps）へ
+# 通信するため、predict などの純粋な計算だけのエンドポイントより低くしている。
+_ENDPOINT_LIMITS = {
+    "api.get_forecast": 20,
+    "api.get_week": 15,
+    "api.compare_cities": 30,
+    "api.plan": 20,
+}
+
+# レート制限をかけないエンドポイント（起動確認・仕様の取得は絞る意味が薄い）
+_RATE_LIMIT_EXEMPT = {"api.health", "api.openapi_json"}
+
+# /api/compare?refresh=1 は、30分キャッシュを無視して47都市ぶんを
+# 取得し直す重い操作。連発されると外部の利用上限に当たりかねないので、
+# 上のエンドポイント単位の制限とは別に、もっと厳しい上限を重ねてかける。
+_COMPARE_REFRESH_LIMIT_PER_MINUTE = 2
+
+
+def _rate_limit_key(suffix: str = "") -> str:
+    """レート制限のキー（IPアドレス＋エンドポイント＋任意の区別）を作る。
+
+    プロキシ越しでは remote_addr が全員同じになりうるが、
+    このアプリはローカル・教材用途のため、そこまでは対応していない。
+    """
+    identifier = request.remote_addr or "unknown"
+    return f"{identifier}:{request.endpoint}:{suffix}"
+
+
+def _too_many_requests(result) -> tuple:
+    """429 のレスポンスを組み立てる。"""
+    payload = {
+        "ok": False,
+        "error": {
+            "message": "リクエストが多すぎます。しばらく待ってから試してください。",
+            "details": {"limit_per_minute": result.limit,
+                        "retry_after_seconds": result.reset_seconds},
+        },
+    }
+    response = jsonify(payload)
+    response.status_code = 429
+    response.headers["Retry-After"] = str(result.reset_seconds)
+    return response
+
+
 def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> Blueprint:
     """API のルートをまとめた Blueprint を作る。"""
     api = Blueprint("api", __name__)
+
+    @api.before_request
+    def enforce_rate_limit():
+        """エンドポイントごとの上限を確認する。超過なら429で止める。"""
+        if request.endpoint in _RATE_LIMIT_EXEMPT:
+            return None
+
+        limit = _ENDPOINT_LIMITS.get(request.endpoint, rate_limit.DEFAULT_LIMIT_PER_MINUTE)
+        result = rate_limit.check(_rate_limit_key(), limit=limit)
+        if not result.allowed:
+            return _too_many_requests(result)
+
+        g.rate_limit_result = result
+
+        if request.endpoint == "api.compare_cities" and request.args.get("refresh") == "1":
+            refresh_result = rate_limit.check(
+                _rate_limit_key("refresh"), limit=_COMPARE_REFRESH_LIMIT_PER_MINUTE
+            )
+            if not refresh_result.allowed:
+                return _too_many_requests(refresh_result)
+
+        return None
+
+    @api.after_request
+    def add_rate_limit_headers(response):
+        """あと何回使えるかを、成功したレスポンスにも添える。"""
+        result = g.get("rate_limit_result")
+        if result is not None:
+            response.headers["X-RateLimit-Limit"] = str(result.limit)
+            response.headers["X-RateLimit-Remaining"] = str(result.remaining)
+        return response
 
     @api.get("/openapi.json")
     def openapi_json():

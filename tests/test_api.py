@@ -60,6 +60,20 @@ class FakeForecast:
                               model_version="test", notes=["再帰予測のテスト用"])
 
 
+@pytest.fixture(autouse=True)
+def clean_rate_limit():
+    """レート制限のカウンタを、テストごとにきれいにする。
+
+    グローバルな状態を持つモジュールなので、これが無いとテストの実行順で
+    「前のテストが叩いた分」を引き継いでしまい、結果が不安定になる。
+    """
+    import rate_limit
+
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     """予測の記録を一時フォルダへ逃がしたテスト用クライアント。"""
@@ -415,3 +429,55 @@ def test_週間予報は都市の指定が要る(client):
     response = client.get("/api/week")
     assert response.status_code == 400
     assert "東京" in response.get_json()["error"]["details"]["cities"]
+
+
+@needs_models
+def test_レート制限を超えると429になる(client):
+    for _ in range(60):
+        assert client.post("/api/predict", json=GOOD_DAY).status_code == 200
+
+    response = client.post("/api/predict", json=GOOD_DAY)
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+    assert response.get_json()["error"]["details"]["limit_per_minute"] == 60
+
+
+@needs_models
+def test_成功したレスポンスにも残り回数が入る(client):
+    response = client.post("/api/predict", json=GOOD_DAY)
+
+    assert response.headers["X-RateLimit-Limit"] == "60"
+    assert response.headers["X-RateLimit-Remaining"] == "59"
+
+
+@needs_models
+def test_healthとopenapiはレート制限の対象外(client):
+    for _ in range(65):
+        assert client.get("/api/health").status_code == 200
+        assert client.get("/api/openapi.json").status_code == 200
+
+
+@needs_models
+def test_エンドポイントごとに別々に数える(client):
+    for _ in range(60):
+        client.post("/api/predict", json=GOOD_DAY)
+
+    # predict は上限に達しているが、weather-types は別カウントなので通る
+    assert client.get("/api/weather-types").status_code == 200
+
+
+@needs_models
+def test_都市比較の強制更新には別枠の厳しい上限がある(client, monkeypatch):
+    import api
+
+    monkeypatch.setattr(api.city_comparison, "get_comparison",
+                        lambda service, force_refresh=False: {
+                            "rankings": [], "errors": [], "fetched_at": 0.0,
+                            "ttl_seconds": 1800, "cache_age_seconds": 0,
+                        })
+
+    for _ in range(api._COMPARE_REFRESH_LIMIT_PER_MINUTE):
+        assert client.get("/api/compare?refresh=1").status_code == 200
+
+    response = client.get("/api/compare?refresh=1")
+    assert response.status_code == 429
