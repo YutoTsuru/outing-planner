@@ -541,3 +541,9 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 モデルの読み込み・入力の検証・カテゴリの文言は、どちらも同じコードを使っています
 （[`outing_ml/serve.py`](../outing_ml/serve.py) と [`presentation.py`](../presentation.py)）。
+
+## 13. アクセシビリティ
+
+キーボード操作とスクリーンリーダーへの対応（スキップリンク・label の関連付け・
+表の caption・色のコントラストなど）は [doc/accessibility.md](accessibility.md)
+にまとめています。

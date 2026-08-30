@@ -5,18 +5,19 @@
 <div class="card">
   <h2>{{ city }}｜{{ week.base_date }} からの{{ week.days | length }}日間</h2>
 
-  <div class="warn">
+  <div class="warn" role="status">
     <ul>{% for note in week.notes %}<li>{{ note }}</li>{% endfor %}</ul>
   </div>
 
   <div class="table-scroll">
     <table>
+      <caption class="sr-only">{{ city }}の{{ week.days | length }}日間の天気とおすすめ</caption>
       <thead>
         <tr>
-          <th>日</th><th>日付</th>
-          {% for field in fields_view %}<th class="num">{{ field.label }}</th>{% endfor %}
-          <th>予測区間の幅</th>
-          <th>おすすめ</th>
+          <th scope="col">日</th><th scope="col">日付</th>
+          {% for field in fields_view %}<th scope="col" class="num">{{ field.label }}</th>{% endfor %}
+          <th scope="col">予測区間の幅</th>
+          <th scope="col">おすすめ</th>
         </tr>
       </thead>
       <tbody>
@@ -32,7 +33,7 @@
             {% if span %}気温 {{ span.low }}〜{{ span.high }}℃{% else %}—{% endif %}
           </td>
           <td>
-            {% if day.recommendation %}{{ labels[day.recommendation.category].emoji }} {{ labels[day.recommendation.category].name }}{% else %}—{% endif %}
+            {% if day.recommendation %}<span aria-hidden="true">{{ labels[day.recommendation.category].emoji }}</span> {{ labels[day.recommendation.category].name }}{% else %}—{% endif %}
           </td>
         </tr>
         {% endfor %}

@@ -10,7 +10,7 @@
   </p>
 
   {% if data.errors %}
-  <div class="warn">
+  <div class="warn" role="status">
     <ul>
       {% for error in data.errors %}
       <li>{{ error.city }}: {{ error.message }}</li>
@@ -29,10 +29,11 @@
 <div class="card">
   <div class="table-scroll">
     <table>
+      <caption class="sr-only">47都市の、あしたのおでかけ日和度ランキング</caption>
       <thead>
         <tr>
-          <th>順位</th><th>都市</th><th class="num">日和度</th><th>おすすめ</th>
-          {% for field in fields_view %}<th class="num">{{ field.label }}</th>{% endfor %}
+          <th scope="col">順位</th><th scope="col">都市</th><th scope="col" class="num">日和度</th><th scope="col">おすすめ</th>
+          {% for field in fields_view %}<th scope="col" class="num">{{ field.label }}</th>{% endfor %}
         </tr>
       </thead>
       <tbody>
@@ -44,7 +45,7 @@
             {% if row.comfort_score is not none %}{{ row.comfort_score | round | int }}点{% else %}—{% endif %}
           </td>
           <td>
-            {% if row.category %}{{ labels[row.category].emoji }} {{ labels[row.category].name }}{% else %}—{% endif %}
+            {% if row.category %}<span aria-hidden="true">{{ labels[row.category].emoji }}</span> {{ labels[row.category].name }}{% else %}—{% endif %}
           </td>
           {% for field in fields_view %}
           <td class="num">{{ row.weather.get(field.name, "—") }}{{ field.unit if field.name in row.weather else "" }}</td>

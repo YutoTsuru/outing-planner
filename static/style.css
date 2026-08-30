@@ -166,12 +166,63 @@ footer.site a { color: var(--accent); }
     * { animation: none !important; transition: none !important; }
 }
 
+/* いずれも白地・暗い地の背景に対して 4.5:1 以上のコントラスト比を確認済み（WCAG AA）。 */
 .status-ok { color: #1a7a4c; font-weight: 700; }
-.status-watch { color: #a6740a; font-weight: 700; }
+.status-watch { color: #8a5a12; font-weight: 700; }
 .status-alert { color: #b0342d; font-weight: 700; }
 
 @media (prefers-color-scheme: dark) {
     .status-ok { color: #4fd393; }
     .status-watch { color: #f2c14e; }
     .status-alert { color: #ff8a80; }
+}
+
+/* スキップリンク。ふだんは画面外に置き、キーボードでタブ移動して
+   フォーカスが当たったときだけ見えるようにする。 */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 12px;
+    z-index: 100;
+    padding: 10px 16px;
+    background: var(--card);
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.skip-link:focus {
+    top: 12px;
+}
+
+/* リンク全般のキーボードフォーカスも、フォームと同じ見た目にそろえる
+   （ナビ以外のリンク＝結果カードの内部リンク等）にも輪郭を出す）。 */
+a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+table caption {
+    text-align: left;
+    caption-side: top;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+/* スクリーンリーダーだけに読ませ、画面には出さない
+   （見出しで代わりの説明が既にある表の caption などに使う）。 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

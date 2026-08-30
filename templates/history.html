@@ -10,7 +10,7 @@
   </p>
 
   {% if not logging_enabled %}
-  <div class="warn">記録は現在オフです（<code>OUTING_LOG_PREDICTIONS=0</code>）。</div>
+  <div class="warn" role="status">記録は現在オフです（<code>OUTING_LOG_PREDICTIONS=0</code>）。</div>
   {% endif %}
 
   {% if summary.total == 0 %}
@@ -61,11 +61,12 @@
   <h2>最近の {{ entries | length }} 件</h2>
   <div class="table-scroll">
     <table>
+      <caption class="sr-only">最近の予測 {{ entries | length }} 件の記録</caption>
       <thead>
         <tr>
-          <th>日時（UTC）</th><th>経路</th>
-          <th class="num">気温</th><th class="num">降水</th><th class="num">風速</th><th class="num">湿度</th>
-          <th>予測</th><th class="num">確信度</th>
+          <th scope="col">日時（UTC）</th><th scope="col">経路</th>
+          <th scope="col" class="num">気温</th><th scope="col" class="num">降水</th><th scope="col" class="num">風速</th><th scope="col" class="num">湿度</th>
+          <th scope="col">予測</th><th scope="col" class="num">確信度</th>
         </tr>
       </thead>
       <tbody>

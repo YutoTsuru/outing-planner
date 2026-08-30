@@ -8,7 +8,8 @@
 
   <div class="table-scroll">
     <table>
-      <thead><tr><th>項目</th><th class="num">予測</th><th class="num">だいたいこの範囲（80%）</th></tr></thead>
+      <caption class="sr-only">{{ city }}のあしたの天気予測</caption>
+      <thead><tr><th scope="col">項目</th><th scope="col" class="num">予測</th><th scope="col" class="num">だいたいこの範囲（80%）</th></tr></thead>
       <tbody>
         {% for field in fields %}
         <tr>
@@ -25,7 +26,7 @@
   </div>
 
   {% if forecast.notes %}
-  <div class="warn" style="margin-top:18px">
+  <div class="warn" role="status" style="margin-top:18px">
     <ul>{% for note in forecast.notes %}<li>{{ note }}</li>{% endfor %}</ul>
   </div>
   {% endif %}

@@ -7,21 +7,31 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<a class="skip-link" href="#main-content">本文へ移動</a>
 <div class="wrap">
   <header class="site">
-    <h1><a href="{{ url_for('web.index') }}">☀️ お出かけプランナー</a></h1>
-    <nav>
-      <a href="{{ url_for('web.index') }}">天気から</a>
-      <a href="{{ url_for('web.forecast_page') }}">あしたの予報</a>
-      <a href="{{ url_for('web.compare_page') }}">都市を比べる</a>
-      <a href="{{ url_for('web.monitor_page') }}">監視</a>
-      <a href="{{ url_for('web.history_page') }}">予測の記録</a>
-      <a href="{{ url_for('web.models_page') }}">モデルの状態</a>
-      <a href="{{ url_for('web.api_docs') }}">API仕様</a>
+    <h1><a href="{{ url_for('web.index') }}"><span aria-hidden="true">☀️</span> お出かけプランナー</a></h1>
+    <nav aria-label="主要ナビゲーション">
+      <a href="{{ url_for('web.index') }}"
+         {% if request.endpoint == 'web.index' %}aria-current="page"{% endif %}>天気から</a>
+      <a href="{{ url_for('web.forecast_page') }}"
+         {% if request.endpoint == 'web.forecast_page' %}aria-current="page"{% endif %}>あしたの予報</a>
+      <a href="{{ url_for('web.compare_page') }}"
+         {% if request.endpoint == 'web.compare_page' %}aria-current="page"{% endif %}>都市を比べる</a>
+      <a href="{{ url_for('web.monitor_page') }}"
+         {% if request.endpoint == 'web.monitor_page' %}aria-current="page"{% endif %}>監視</a>
+      <a href="{{ url_for('web.history_page') }}"
+         {% if request.endpoint == 'web.history_page' %}aria-current="page"{% endif %}>予測の記録</a>
+      <a href="{{ url_for('web.models_page') }}"
+         {% if request.endpoint == 'web.models_page' %}aria-current="page"{% endif %}>モデルの状態</a>
+      <a href="{{ url_for('web.api_docs') }}"
+         {% if request.endpoint == 'web.api_docs' %}aria-current="page"{% endif %}>API仕様</a>
     </nav>
   </header>
 
-  {% block content %}{% endblock %}
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
 
   <footer class="site">
     予測は機械学習モデルによるものです。授業用の教材のため、実際の外出の可否判断には使わないでください。<br>

@@ -1,7 +1,7 @@
 {# 予測結果のカード。天気から予測したときと、あしたの予報から予測したときの両方で使う。 #}
 <div class="card">
   <div class="result-head">
-    <div class="result-emoji">{{ label.emoji }}</div>
+    <div class="result-emoji" aria-hidden="true">{{ label.emoji }}</div>
     <div>
       <span class="result-caption">{{ caption }}</span>
       <span class="result-name">{{ label.name }}</span>
@@ -11,7 +11,7 @@
   <p class="reason">{{ reason }}</p>
 
   {% if result.warnings %}
-  <div class="warn">
+  <div class="warn" role="status">
     <ul>{% for text in result.warnings %}<li>{{ text }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
