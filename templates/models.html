@@ -22,7 +22,8 @@
   <p class="lead">どのデータで・いつ・どの版を作ったかの記録です（model/registry.json）。</p>
   <div class="table-scroll">
     <table>
-      <thead><tr><th>モデル</th><th>版</th><th>やること</th><th>おもな成績</th><th>作成</th></tr></thead>
+      <caption class="sr-only">4つのモデルの学習履歴</caption>
+      <thead><tr><th scope="col">モデル</th><th scope="col">版</th><th scope="col">やること</th><th scope="col">おもな成績</th><th scope="col">作成</th></tr></thead>
       <tbody>
         {% for entry in models %}
         <tr>
@@ -46,7 +47,8 @@
   <h2>天気のタイプ</h2>
   <div class="table-scroll">
     <table>
-      <thead><tr><th>#</th><th>名前</th><th class="num">気温</th><th class="num">降水確率</th><th class="num">風速</th><th class="num">湿度</th><th class="num">割合</th></tr></thead>
+      <caption class="sr-only">天気タイプ分けモデルが作った、天気タイプの一覧</caption>
+      <thead><tr><th scope="col">#</th><th scope="col">名前</th><th scope="col" class="num">気温</th><th scope="col" class="num">降水確率</th><th scope="col" class="num">風速</th><th scope="col" class="num">湿度</th><th scope="col" class="num">割合</th></tr></thead>
       <tbody>
         {% for item in weather_types %}
         <tr>

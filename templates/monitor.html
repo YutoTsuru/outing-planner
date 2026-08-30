@@ -23,7 +23,7 @@
   <p class="lead" style="margin:14px 0 0">{{ report.action }}</p>
 
   {% if report.current_source == "holdout_data" %}
-  <div class="warn">{{ report.current_note }}</div>
+  <div class="warn" role="status">{{ report.current_note }}</div>
   {% else %}
   <p class="lead" style="margin:6px 0 0">{{ report.current_note }}</p>
   {% endif %}
@@ -36,11 +36,12 @@
   </p>
   <div class="table-scroll">
     <table>
+      <caption class="sr-only">天気4項目ごとの、学習データと現在のデータのずれ</caption>
       <thead>
         <tr>
-          <th>項目</th><th>判定</th>
-          <th class="num">PSI</th>
-          <th class="num">基準の平均</th><th class="num">いまの平均</th><th class="num">差</th>
+          <th scope="col">項目</th><th scope="col">判定</th>
+          <th scope="col" class="num">PSI</th>
+          <th scope="col" class="num">基準の平均</th><th scope="col" class="num">いまの平均</th><th scope="col" class="num">差</th>
         </tr>
       </thead>
       <tbody>
