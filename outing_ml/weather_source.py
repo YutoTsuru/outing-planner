@@ -51,9 +51,13 @@ def resolve_city(name: str) -> tuple[str, float, float]:
     return name, latitude, longitude
 
 
-def fetch_city_hourly(name: str, latitude: float, longitude: float,
-                      start_date: str, end_date: str) -> pd.DataFrame:
-    """1都市ぶんの「1時間ごとの気象データ」を取得する。"""
+class RateLimitedError(RuntimeError):
+    """取得元の利用上限に当たったときに投げる例外。"""
+
+
+def _request_hourly(latitude: float, longitude: float,
+                    start_date: str, end_date: str) -> dict:
+    """1回ぶんの取得。上限に当たったら RateLimitedError にする。"""
     params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -66,18 +70,61 @@ def fetch_city_hourly(name: str, latitude: float, longitude: float,
 
     response = requests.get(ARCHIVE_URL, params=params,
                             timeout=CONFIG.data.request_timeout_sec)
-    response.raise_for_status()
-    hourly = response.json()["hourly"]
 
-    frame = pd.DataFrame(
-        {
-            "time": pd.to_datetime(hourly["time"]),
-            "temperature": hourly["temperature_2m"],
-            "humidity": hourly["relative_humidity_2m"],
-            "wind_speed": hourly["wind_speed_10m"],
-            "precipitation": hourly["precipitation"],
-        }
-    )
+    if response.status_code == 429:
+        # サーバが待ち時間を教えてくれることがある
+        wait = response.headers.get("Retry-After")
+        raise RateLimitedError(wait or "")
+
+    response.raise_for_status()
+    return response.json()["hourly"]
+
+
+def fetch_city_hourly(name: str, latitude: float, longitude: float,
+                      start_date: str, end_date: str,
+                      max_retries: int = 4) -> pd.DataFrame:
+    """1都市ぶんの「1時間ごとの気象データ」を取得する。
+
+    取得元（Open-Meteo）の無料枠は、リクエストの回数ではなく
+    「変数の数 × 日数」で消費されます。長い期間を一度に頼むと上限に当たるため、
+    **1年ずつに切って**取り、429 が返ったら待ってからやり直します。
+    """
+    frames = []
+    start_year = int(start_date[:4])
+    end_year = int(end_date[:4])
+
+    for year in range(start_year, end_year + 1):
+        chunk_start = max(start_date, f"{year}-01-01")
+        chunk_end = min(end_date, f"{year}-12-31")
+
+        for attempt in range(max_retries):
+            try:
+                hourly = _request_hourly(latitude, longitude, chunk_start, chunk_end)
+                break
+            except RateLimitedError as error:
+                if attempt == max_retries - 1:
+                    raise
+                # Retry-After があればそれに従い、無ければ 30秒 → 60 → 120 と待つ
+                wait = int(str(error)) if str(error).isdigit() else 30 * (2 ** attempt)
+                print(f"      利用上限のため {wait} 秒待ちます（{name} {year}年）", flush=True)
+                time.sleep(wait)
+        else:  # pragma: no cover - 上の break / raise で必ず抜ける
+            raise RateLimitedError("")
+
+        frames.append(
+            pd.DataFrame(
+                {
+                    "time": pd.to_datetime(hourly["time"]),
+                    "temperature": hourly["temperature_2m"],
+                    "humidity": hourly["relative_humidity_2m"],
+                    "wind_speed": hourly["wind_speed_10m"],
+                    "precipitation": hourly["precipitation"],
+                }
+            )
+        )
+        time.sleep(CONFIG.data.request_interval_sec)
+
+    frame = pd.concat(frames, ignore_index=True)
     frame["city"] = name
     return frame
 
@@ -120,22 +167,37 @@ def summarize_by_day(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def download_range(start_date: str, end_date: str, cities=None,
-                   progress=None) -> pd.DataFrame:
-    """指定した期間ぶんを、全都市について取得する。"""
+                   progress=None, on_city=None, done_cities=()) -> pd.DataFrame:
+    """指定した期間ぶんを、都市ごとに取得する。
+
+    途中で利用上限に当たったら、そこまでに取れたぶんを返します（例外にしません）。
+    残りは日を改めて --resume で続きから取れます。
+    """
     cities = cities or CONFIG.data.cities
+    remaining = [city for city in cities if city[0] not in set(done_cities)]
     frames = []
 
-    for index, (name, latitude, longitude) in enumerate(cities, start=1):
+    for index, (name, latitude, longitude) in enumerate(remaining, start=1):
         if progress:
-            progress(index, len(cities), name)
+            progress(index, len(remaining), name)
 
-        daily = summarize_by_day(fetch_city_hourly(name, latitude, longitude,
-                                                   start_date, end_date))
+        try:
+            daily = summarize_by_day(
+                fetch_city_hourly(name, latitude, longitude, start_date, end_date)
+            )
+        except RateLimitedError:
+            print(f"      取得元の利用上限に達しました。{name} 以降は次回に回します", flush=True)
+            break
+
         frames.append(daily)
+        if on_city:
+            on_city(name, daily)
 
-        if index < len(cities):
-            time.sleep(CONFIG.data.request_interval_sec)
-
+    if not frames:
+        return pd.DataFrame(
+            columns=["city", "date", "temperature", "rain_probability",
+                     "wind_speed", "humidity"]
+        )
     return pd.concat(frames, ignore_index=True).sort_values(["city", "date"])
 
 

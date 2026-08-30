@@ -24,6 +24,8 @@ import argparse
 import os
 from datetime import date, timedelta
 
+import pandas as pd
+
 from outing_ml.config import CONFIG
 from outing_ml.data import validate_frame
 from outing_ml.weather_source import download_range
@@ -52,6 +54,28 @@ def holdout_end_date():
     return (date.today() - timedelta(days=CONFIG.data.holdout_lag_days)).isoformat()
 
 
+def expected_days(start_date, end_date):
+    """期間に含まれる日数。"""
+    return (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
+
+
+def completed_cities(path, start_date, end_date, tolerance=0.95):
+    """すでに取れている都市を返す。
+
+    欠測で数日落ちることがあるので、期待日数の 95% 以上あれば「取れている」とみなします。
+    """
+    if not os.path.exists(path):
+        return set(), None
+
+    frame = pd.read_csv(path)
+    if frame.empty:
+        return set(), None
+
+    needed = expected_days(start_date, end_date) * tolerance
+    counts = frame.groupby("city")["date"].count()
+    return set(counts[counts >= needed].index), frame
+
+
 def save(df, path):
     """検証してから保存する。"""
     report = validate_frame(df)
@@ -61,22 +85,55 @@ def save(df, path):
             print(f"    - {error}")
         raise SystemExit(1)
 
-    for warning in report.warnings:
+    for warning in report.warnings[:3]:
         print(f"  ⚠ {warning}")
+    if len(report.warnings) > 3:
+        print(f"  ⚠ ほか {len(report.warnings) - 3} 件の警告")
 
     os.makedirs(DATA_DIR, exist_ok=True)
     df.to_csv(path, index=False)
-    print(f"\n保存しました: {path}（{len(df)} 行）")
+    print(f"\n保存しました: {path}（{len(df):,} 行 / {df['city'].nunique()} 都市）")
 
 
-def build(path, start_date, end_date, label, force):
-    """1つのデータセットを作る。"""
-    if os.path.exists(path) and not force:
-        print(f"すでにあります: {path}（作り直すときは --force）")
+def build(path, start_date, end_date, label, force, resume):
+    """1つのデータセットを作る（途中まででも保存する）。"""
+    total_cities = len(CONFIG.data.cities)
+
+    if os.path.exists(path) and not force and not resume:
+        print(f"すでにあります: {path}（作り直すなら --force、続きから取るなら --resume）")
+        return
+
+    done, existing = (set(), None)
+    if resume and not force:
+        done, existing = completed_cities(path, start_date, end_date)
+        if done:
+            print(f"\n{label}: {len(done)}/{total_cities} 都市はすでに取得済み。残りを取ります")
+
+    if len(done) >= total_cities:
+        print(f"{label}: すべての都市がそろっています（{path}）")
         return
 
     print(f"\n{label}を取得します（{start_date} 〜 {end_date}）")
-    save(download_range(start_date, end_date, progress=report_progress), path)
+    fetched = download_range(start_date, end_date, progress=report_progress,
+                             done_cities=done)
+
+    if fetched.empty and existing is None:
+        print("  1件も取得できませんでした")
+        raise SystemExit(1)
+
+    frames = [frame for frame in (existing, fetched) if frame is not None and not frame.empty]
+    combined = (
+        pd.concat(frames, ignore_index=True)
+        .drop_duplicates(["city", "date"], keep="last")
+        .sort_values(["city", "date"])
+        .reset_index(drop=True)
+    )
+    save(combined, path)
+
+    missing = total_cities - combined["city"].nunique()
+    if missing:
+        print(f"  残り {missing} 都市は未取得です。"
+              f"時間をおいて python fetch_weather.py --resume で続きから取れます")
 
 
 def main():
@@ -84,6 +141,8 @@ def main():
     parser.add_argument("--holdout", action="store_true", help="未来データだけを作る")
     parser.add_argument("--all", action="store_true", help="学習データと未来データの両方を作る")
     parser.add_argument("--force", action="store_true", help="すでにあっても作り直す")
+    parser.add_argument("--resume", action="store_true",
+                        help="すでに取れている都市は飛ばして、残りだけ取る")
     args = parser.parse_args()
 
     want_train = args.all or not args.holdout
@@ -91,11 +150,11 @@ def main():
 
     if want_train:
         build(DATA_PATH, CONFIG.data.start_date, CONFIG.data.end_date,
-              "学習データ", args.force)
+              "学習データ", args.force, args.resume)
 
     if want_holdout:
         build(HOLDOUT_PATH, CONFIG.data.holdout_start_date, holdout_end_date(),
-              "未来データ（ホールドアウト）", args.force)
+              "未来データ（ホールドアウト）", args.force, args.resume)
 
     print("\n次は python train_all.py でモデルを学習してください。")
 
