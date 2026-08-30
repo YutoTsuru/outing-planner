@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ city }}の週間予報 ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>{{ city }}｜{{ week.base_date }} からの{{ week.days | length }}日間</h2>
+
+  <div class="warn">
+    <ul>{% for note in week.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>日</th><th>日付</th>
+          {% for field in fields_view %}<th class="num">{{ field.label }}</th>{% endfor %}
+          <th>予測区間の幅</th>
+          <th>おすすめ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for day in week.days %}
+        <tr>
+          <td>{{ "あした" if day.day == 1 else (day.day ~ "日後") }}</td>
+          <td>{{ day.date }}</td>
+          {% for field in fields_view %}
+          <td class="num">{{ day.weather.get(field.name, "—") }}{{ field.unit if field.name in day.weather else "" }}</td>
+          {% endfor %}
+          <td>
+            {% set span = day.interval.get("temperature") %}
+            {% if span %}気温 {{ span.low }}〜{{ span.high }}℃{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if day.recommendation %}{{ labels[day.recommendation.category].emoji }} {{ labels[day.recommendation.category].name }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <p class="lead" style="margin:0">
+    2日目より先は、予測した天気をもう一度モデルに入れ直して作っています（再帰予測）。
+    表の「予測区間の幅」が日を追うごとに広がっているのは、誤差が積み重なっている
+    ことの目安です。3日目以降は当たり外れの参考程度に見てください。
+    JSON で取るなら <code>/api/week?city={{ city }}</code>。
+  </p>
+</div>
+
+{% endblock %}

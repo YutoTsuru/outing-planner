@@ -145,6 +145,26 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         return render_template("predict.html", weather=weather,
                                **result_context(result, weather))
 
+    @web.get("/week")
+    def week_page():
+        city = request.args.get("city")
+        if not city:
+            return redirect(url_for("web.index"))
+        if forecast is None:
+            raise WebError("翌日予測モデルが読み込まれていません。python train_forecast.py を実行してください。", 503)
+
+        try:
+            result = forecast.predict_week(city)
+        except UnknownCityError as error:
+            raise WebError(str(error)) from error
+        except ForecastUnavailableError as error:
+            raise WebError(str(error), 503) from error
+
+        api_module.prediction_log.append("web_week", {"city": city, "days": len(result.days)})
+        return render_template("week.html", city=city, week=result,
+                               labels=presentation.label_views(),
+                               fields_view=presentation.weather_fields())
+
     @web.get("/forecast")
     def forecast_page():
         city = request.args.get("city")

@@ -36,7 +36,8 @@
         </select>
       </div>
     </div>
-    <button type="submit">あしたの予報から探す</button>
+    <button type="submit" name="range" value="tomorrow" formaction="{{ url_for('web.forecast_page') }}">あしたの予報から探す</button>
+    <button type="submit" name="range" value="week" formaction="{{ url_for('web.week_page') }}">1週間の予報を見る</button>
   </form>
 </div>
 
