@@ -31,6 +31,7 @@ import geocoding
 import planner
 import prediction_log
 from monitoring import MonitorUnavailableError, monitor_report
+from outing_ml import forecasting
 from outing_ml.config import CATEGORIES, FEATURE_COLUMNS, INPUT_RANGES
 from outing_ml.forecasting import ForecastService, ForecastUnavailableError
 from outing_ml.registry import Registry
@@ -198,6 +199,30 @@ def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> 
 
         log_prediction("predict_batch", {"count": len(results)})
         return jsonify({"ok": True, "count": len(results), "results": results})
+
+    @api.get("/week")
+    def get_week():
+        """指定した都市の、数日先までの天気とおすすめをまとめて返す。"""
+        if forecast is None:
+            raise ApiError("翌日予測モデルが読み込まれていません", 503)
+
+        city = request.args.get("city")
+        if not city:
+            raise ApiError("city を指定してください", 400, {"cities": city_names()})
+
+        days_ahead = query_int("days", 7, 1, forecasting.MAX_FORECAST_DAYS)
+        history_days = query_int("history_days", 10, 5, 30)
+
+        try:
+            result = forecast.predict_week(city, days_ahead=days_ahead,
+                                           history_days=history_days)
+        except UnknownCityError as error:
+            raise ApiError(str(error), 400, {"cities": city_names()}) from error
+        except ForecastUnavailableError as error:
+            raise ApiError(str(error), 503) from error
+
+        log_prediction("week", {"city": city, "days": len(result.days)})
+        return jsonify({"ok": True, **result.to_dict()})
 
     @api.get("/forecast")
     def get_forecast():

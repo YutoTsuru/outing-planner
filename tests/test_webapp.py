@@ -43,6 +43,22 @@ class FakeForecast:
             model_version="test", notes=["テスト用の予報です"],
         )
 
+    def predict_week(self, city, days_ahead=7, history_days=10):
+        from outing_ml.forecasting import DailyForecast, WeeklyForecast
+
+        weather = {"temperature": 22.0, "rain_probability": 10.0,
+                   "wind_speed": 2.0, "humidity": 50.0}
+        days = [
+            DailyForecast(
+                day=day, date=f"2026-08-{27 + day:02d}", weather=weather,
+                interval={"temperature": {"low": 20.0 - day, "high": 24.0 + day}},
+                recommendation=self.outing.predict(**weather),
+            )
+            for day in range(1, days_ahead + 1)
+        ]
+        return WeeklyForecast(city=city, base_date="2026-08-27", days=days,
+                              model_version="test", notes=["週間予報のテスト用"])
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -236,3 +252,17 @@ def test_都市比較の画面が表示される(client, monkeypatch):
     body = text_of(client.get("/compare"))
     assert "那覇" in body
     assert "秒前に取得" in body
+
+
+@needs_models
+def test_週間予報の画面が表示される(client):
+    body = text_of(client.get("/week?city=東京"))
+
+    assert "7日間" in body
+    assert "あした" in body
+    assert "再帰予測" in body
+
+
+@needs_models
+def test_週間予報は都市の指定が無ければトップへ戻す(client):
+    assert client.get("/week").status_code == 302

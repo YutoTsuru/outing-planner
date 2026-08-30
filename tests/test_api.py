@@ -45,6 +45,20 @@ class FakeForecast:
             model_version="test",
         )
 
+    def predict_week(self, city, days_ahead=7, history_days=10):
+        from outing_ml.forecasting import DailyForecast, WeeklyForecast
+
+        days = [
+            DailyForecast(
+                day=day, date=f"2026-08-{27 + day:02d}", weather=dict(GOOD_DAY),
+                interval={"temperature": {"low": 20.0 - day, "high": 24.0 + day}},
+                recommendation=self.outing.predict(**GOOD_DAY),
+            )
+            for day in range(1, days_ahead + 1)
+        ]
+        return WeeklyForecast(city=city, base_date="2026-08-27", days=days,
+                              model_version="test", notes=["再帰予測のテスト用"])
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -372,3 +386,32 @@ def test_都市比較で強制更新を渡せる(client, monkeypatch):
 
     client.get("/api/compare?refresh=1")
     assert captured["force_refresh"] is True
+
+
+@needs_models
+def test_週間予報が返る(client):
+    body = client.get("/api/week?city=東京").get_json()
+
+    assert body["ok"]
+    assert len(body["days"]) == 7
+    assert body["days"][0]["day"] == 1
+    assert body["notes"]
+
+
+@needs_models
+def test_週間予報の日数指定を絞れる(client):
+    body = client.get("/api/week?city=東京&days=3").get_json()
+    assert len(body["days"]) == 3
+
+
+@needs_models
+def test_週間予報の日数指定が範囲外なら断る(client):
+    assert client.get("/api/week?city=東京&days=999").status_code == 400
+    assert client.get("/api/week?city=東京&days=0").status_code == 400
+
+
+@needs_models
+def test_週間予報は都市の指定が要る(client):
+    response = client.get("/api/week")
+    assert response.status_code == 400
+    assert "東京" in response.get_json()["error"]["details"]["cities"]

@@ -114,3 +114,16 @@ def test_学習範囲の外なら警告がつく():
     service = OutingService.load()
     result = service.predict(40, 10, 2, 50)   # 学習データの最高気温は 36.6℃
     assert any("学習データの範囲" in warning for warning in result.warnings)
+
+
+def test_週間予報の区間は日を追うごとに広がる():
+    from outing_ml.forecasting import ForecastService
+
+    interval = {"temperature": {"low": 20.0, "high": 24.0}}
+    day1 = ForecastService._widen_interval(interval, 1)
+    day4 = ForecastService._widen_interval(interval, 4)
+
+    assert day1 == interval, "1日目は広げない"
+    width1 = day1["temperature"]["high"] - day1["temperature"]["low"]
+    width4 = day4["temperature"]["high"] - day4["temperature"]["low"]
+    assert width4 > width1, "先の日ほど区間が広がる"
