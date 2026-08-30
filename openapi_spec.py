@@ -294,8 +294,32 @@ def build_spec() -> dict:
                         }},
                     },
                     "responses": {
-                        "200": _json_response("Markdown形式のプラン。", _OK_SCHEMA),
+                        "200": _json_response(
+                            "Markdown形式のプランと、共有リンク（share_url）。",
+                            _OK_SCHEMA,
+                            {"ok": True, "category": "outdoor", "area": "京都府京都市",
+                             "plan_markdown": "### 🗺️ 京都府京都市 のお出かけプラン\n...",
+                             "share_id": "608e7cadbd08", "share_url": "/share/608e7cadbd08"},
+                        ),
                         "400": _ERROR_RESPONSE,
+                        "404": _ERROR_RESPONSE,
+                    },
+                }
+            },
+            "/share/{plan_id}": {
+                "get": {
+                    "tags": ["プラン"],
+                    "summary": "共有リンクからプランを取り出す",
+                    "description": (
+                        "有効期限やアクセス制限は無い。IDを知っている人なら誰でも開ける。"
+                    ),
+                    "parameters": [
+                        {"name": "plan_id", "in": "path", "required": True,
+                         "schema": {"type": "string"},
+                         "description": "/api/plan のレスポンスに入っている share_id。"},
+                    ],
+                    "responses": {
+                        "200": _json_response("保存されたプラン。", _OK_SCHEMA),
                         "404": _ERROR_RESPONSE,
                     },
                 }

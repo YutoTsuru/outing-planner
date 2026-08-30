@@ -108,6 +108,7 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | `/forecast?city=東京` | あしたの天気の予測（予測区間つき）と、そのおすすめ |
 | `/week?city=東京` | 数日先まで（最大7日）の天気とおすすめ（再帰予測） |
 | `/plan` | 時間つきのお出かけプラン（実在するスポットを探す） |
+| `/share/<plan_id>` | 共有リンクから開いたプラン |
 | `/history` | これまでの予測の記録と傾向（どんな天気のときに使われたか） |
 | `/monitor` | ドリフト監視。学習データと最近の入力を見比べて、学習し直す時期かを判定 |
 | `/compare` | 全都市の、あしたの日和度を高い順に比較 |
@@ -137,7 +138,8 @@ lsof -i :5000        # 使っているプロセスを調べる（macOS / Linux�
 | POST | `/api/predict/batch` | まとめて予測（最大100件） |
 | GET | `/api/forecast?city=東京` | あしたの天気とおすすめ |
 | GET | `/api/week?city=東京` | 数日先まで（`?days=`で1〜7）の天気とおすすめ（再帰予測） |
-| POST | `/api/plan` | 時間つきのお出かけプラン |
+| POST | `/api/plan` | 時間つきのお出かけプラン（共有リンクも返す） |
+| GET | `/api/share/{plan_id}` | 共有リンクからプランを取り出す |
 | GET | `/api/openapi.json` | このAPIの仕様（OpenAPI 3.0） |
 
 ### 予測する
@@ -204,6 +206,24 @@ curl http://127.0.0.1:5000/api/openapi.json | python -m json.tool
 `openapi_spec.py` も忘れずに直してください。`tests/test_openapi.py` が、
 api.py の実際のルートと仕様のパスが一致しているかを機械的に確かめます
 （載せ忘れ・消し忘れのどちらも検出します）。
+
+### プランを共有する
+
+`/plan`（画面）で作ったプランには、そのつど短いリンクが発行されます。
+このリンクを知っている人は誰でも同じプランを開けます。
+有効期限やアクセス制限はありません（教材用の簡易な仕組みです）。
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/plan \
+  -H "Content-Type: application/json" \
+  -d '{"category": "outdoor", "area": "京都市"}'
+# → {"ok": true, "…": "…", "share_id": "608e7cadbd08", "share_url": "/share/608e7cadbd08"}
+
+curl http://127.0.0.1:5000/api/share/608e7cadbd08
+```
+
+プランは `reports/shared_plans.jsonl` に1行ずつ追記します
+（`reports/predictions.jsonl` と同じ仕組み）。データベースは使っていません。
 
 ### 数日先まで見る
 

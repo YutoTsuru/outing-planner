@@ -26,11 +26,23 @@ ROUTE_PATTERN = re.compile(r'@api\.(get|post)\("([^"]+)"\)')
 SELF_ROUTE = ("GET", "/openapi.json")
 
 
+# Flask の <plan_id> 形式を OpenAPI の {plan_id} 形式に直す
+FLASK_PARAM_PATTERN = re.compile(r"<(?:[a-zA-Z_]+:)?([a-zA-Z_][a-zA-Z0-9_]*)>")
+
+
+def _to_openapi_path(path: str) -> str:
+    """Flask のパスパラメータ記法を OpenAPI の記法に変換する。"""
+    return FLASK_PARAM_PATTERN.sub(r"{\1}", path)
+
+
 def actual_routes() -> set[tuple[str, str]]:
     """api.py に実際に定義されているルートを (メソッド, パス) の集合で返す（自己参照を除く）。"""
     with open("api.py", encoding="utf-8") as file:
         source = file.read()
-    routes = {(method.upper(), path) for method, path in ROUTE_PATTERN.findall(source)}
+    routes = {
+        (method.upper(), _to_openapi_path(path))
+        for method, path in ROUTE_PATTERN.findall(source)
+    }
     routes.discard(SELF_ROUTE)
     return routes
 
