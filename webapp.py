@@ -23,6 +23,7 @@ import os
 
 from flask import Blueprint, Flask, redirect, render_template, request, url_for
 
+import access_log
 import api as api_module
 import city_comparison
 import geocoding
@@ -286,6 +287,7 @@ def create_web_app(outing: OutingService = None,
     """画面と REST API をまとめた Flask アプリを作る。"""
     app = Flask(__name__)
     app.json.ensure_ascii = False
+    access_log.install(app)
 
     outing = outing or OutingService.load()
     if forecast is None:

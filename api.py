@@ -27,6 +27,7 @@ from typing import Any
 
 from flask import Blueprint, Flask, g, jsonify, request
 
+import access_log
 import city_comparison
 import geocoding
 import planner
@@ -432,6 +433,7 @@ def create_api(outing: OutingService = None, forecast: ForecastService = None,
     """
     app = Flask(__name__)
     app.json.ensure_ascii = False   # 日本語をそのまま返す
+    access_log.install(app)
 
     outing = outing or OutingService.load()
 

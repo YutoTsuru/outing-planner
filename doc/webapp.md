@@ -329,7 +329,43 @@ curl -i -X POST http://127.0.0.1:5000/api/predict \
 プロセス内のメモリだけで数えるため、`gunicorn --workers 2` のように複数
 ワーカーで動かすと、ワーカーごとに別々に数えます（1ワーカーあたりの上限になります）。
 
-## 7. 都市を比べる
+## 7. アクセスログ
+
+すべてのリクエストを、標準出力へ1行1JSONの形で記録します。
+
+```json
+{"request_id": "ce26a8e3-...", "timestamp": "2026-08-30T12:42:08.815+00:00",
+ "method": "POST", "path": "/api/predict", "status": 200,
+ "duration_ms": 91.13, "remote_addr": "127.0.0.1", "rate_limit_remaining": 59}
+```
+
+| 項目 | 内容 |
+| --- | --- |
+| `request_id` | リクエストごとの一意なID（UUID）。レスポンスの `X-Request-Id` ヘッダーにも同じ値が付く |
+| `timestamp` | ISO 8601（UTC、ミリ秒まで） |
+| `method` / `path` | HTTPメソッドとパス（クエリ文字列を含む） |
+| `status` | レスポンスのステータスコード |
+| `duration_ms` | 処理にかかった時間（ミリ秒） |
+| `remote_addr` | リクエスト元のIPアドレス |
+| `rate_limit_remaining` | レート制限がかかっているエンドポイントだけ。残り回数 |
+
+`jq` で絞り込めます。
+
+```bash
+python webapp.py 2>&1 | grep '^{' | jq 'select(.status >= 400)'
+```
+
+止めたいときは環境変数で切れます。
+
+```bash
+OUTING_ACCESS_LOG=0 python webapp.py
+```
+
+実装は `access_log.py`。Flask の開発サーバが既定で出す
+`127.0.0.1 - - [日付] "GET /api/health" 200 -` という行は、これとは別に出続けます
+（人が読む用にそのまま残しています）。
+
+## 8. 都市を比べる
 
 `/compare` で、47都市すべての「あしたの日和度」を高い順に並べて見られます。
 どの都市も同じ翌日予測モデルとカテゴリ予測モデルを使っています。
@@ -369,7 +405,7 @@ curl http://127.0.0.1:5000/api/compare
 一部の都市だけ取得に失敗しても（例：取得元が一時的に応答しない）、
 その都市は `errors` に理由が入り、残りの都市のランキングは表示されます。
 
-## 8. 予測の記録
+## 9. 予測の記録
 
 予測するたびに `reports/predictions.jsonl` へ1行ずつ残します（JSON Lines・追記のみ）。
 
@@ -416,7 +452,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 9. つまずいたら
+## 10. つまずいたら
 
 | 症状 | 原因と直し方 |
 | --- | --- |
@@ -430,7 +466,7 @@ OUTING_LOG_PREDICTIONS=0 python webapp.py
 
 ---
 
-## 10. Gradio 版（app.py）との違い
+## 11. Gradio 版（app.py）との違い
 
 | | Gradio（`app.py`） | Flask（`webapp.py`） |
 | --- | --- | --- |
