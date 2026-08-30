@@ -1,6 +1,6 @@
 {
   "model_name": "weather-type-clustering",
-  "created_at": "2026-08-27T13:07:57+00:00",
+  "created_at": "2026-08-30T11:50:21+00:00",
   "task": "天気を似たものどうしにまとめる（教師なし学習・k-means）",
   "estimator": "Pipeline(StandardScaler, KMeans)",
   "features": [
@@ -9,52 +9,52 @@
     "wind_speed",
     "humidity"
   ],
-  "n_clusters": 4,
+  "n_clusters": 3,
   "selection": [
     {
       "タイプ数": 3,
-      "シルエット係数": 0.259640140222722,
-      "CalinskiHarabasz": 8326.208431002107,
-      "DaviesBouldin": 1.3268599469909919,
-      "まとまりの悪さ": 42788.73922928441
+      "シルエット係数": 0.27701728780886486,
+      "CalinskiHarabasz": 46094.645528907844,
+      "DaviesBouldin": 1.2478830319006888,
+      "まとまりの悪さ": 217482.00201185787
     },
     {
       "タイプ数": 4,
-      "シルエット係数": 0.2661945671184806,
-      "CalinskiHarabasz": 7840.448472410919,
-      "DaviesBouldin": 1.19324183067875,
-      "まとまりの悪さ": 35991.404671283184
+      "シルエット係数": 0.2729706040349987,
+      "CalinskiHarabasz": 43450.40464676011,
+      "DaviesBouldin": 1.1729023152025024,
+      "まとまりの悪さ": 181917.18939983082
     },
     {
       "タイプ数": 5,
-      "シルエット係数": 0.26254248963227805,
-      "CalinskiHarabasz": 7280.438908401553,
-      "DaviesBouldin": 1.2766088965898343,
-      "まとまりの悪さ": 31863.914395287527
+      "シルエット係数": 0.2662985746053317,
+      "CalinskiHarabasz": 39880.709840383126,
+      "DaviesBouldin": 1.2569242910644811,
+      "まとまりの悪さ": 161703.15981336814
     },
     {
       "タイプ数": 6,
-      "シルエット係数": 0.2624311929286012,
-      "CalinskiHarabasz": 6887.812621629673,
-      "DaviesBouldin": 1.1577433217212088,
-      "まとまりの悪さ": 28734.964299478095
+      "シルエット係数": 0.2629361562415768,
+      "CalinskiHarabasz": 37070.5366450997,
+      "DaviesBouldin": 1.1879321388358384,
+      "まとまりの悪さ": 147218.17825484363
     },
     {
       "タイプ数": 7,
-      "シルエット係数": 0.25356460692039856,
-      "CalinskiHarabasz": 6575.647742916483,
-      "DaviesBouldin": 1.2182478759131796,
-      "まとまりの悪さ": 26298.770960621558
+      "シルエット係数": 0.24363340950610116,
+      "CalinskiHarabasz": 35132.24735146486,
+      "DaviesBouldin": 1.2090590557727645,
+      "まとまりの悪さ": 135282.6156424359
     },
     {
       "タイプ数": 8,
-      "シルエット係数": 0.24779310109679917,
-      "CalinskiHarabasz": 6370.069075878323,
-      "DaviesBouldin": 1.2088754285439816,
-      "まとまりの悪さ": 24197.46690326634
+      "シルエット係数": 0.24267597535148183,
+      "CalinskiHarabasz": 34245.55180737093,
+      "DaviesBouldin": 1.226841893043129,
+      "まとまりの悪さ": 123864.55900857627
     }
   ],
-  "silhouette": 0.2661945671184806,
+  "silhouette": 0.27701728780886486,
   "stability": {
     "seeds": [
       0,
@@ -63,120 +63,97 @@
       3,
       4
     ],
-    "adjusted_rand_mean": 0.9965955401702822,
-    "adjusted_rand_min": 0.9914888504257051
+    "adjusted_rand_mean": 0.9935652411872626,
+    "adjusted_rand_min": 0.9863658074367802
   },
   "clusters": [
     {
-      "id": 3,
-      "name": "過ごしやすい晴れの日",
-      "count": 6418,
-      "share": 0.32532441200324413,
-      "center": {
-        "temperature": 25.2,
-        "rain_probability": 10.0,
-        "wind_speed": 3.3,
-        "humidity": 65.8
-      },
-      "examples": [
-        "大阪 2024-06-26",
-        "仙台 2022-06-17",
-        "大阪 2021-09-25"
-      ],
-      "category_share": {
-        "outdoor": 0.675,
-        "indoor": 0.191,
-        "relax": 0.133
-      }
-    },
-    {
-      "id": 0,
-      "name": "肌寒い晴れの日",
-      "count": 5608,
-      "share": 0.2842660178426602,
-      "center": {
-        "temperature": 10.0,
-        "rain_probability": 6.1,
-        "wind_speed": 3.0,
-        "humidity": 59.2
-      },
-      "examples": [
-        "東京 2022-03-21",
-        "大阪 2023-03-04",
-        "新潟 2023-12-05"
-      ],
-      "category_share": {
-        "relax": 0.591,
-        "outdoor": 0.339,
-        "indoor": 0.07
-      }
-    },
-    {
       "id": 1,
-      "name": "過ごしやすい雨の日（じめじめ）",
-      "count": 4719,
-      "share": 0.23920316301703162,
+      "name": "過ごしやすい晴れの日",
+      "count": 40295,
+      "share": 0.3911224569032458,
       "center": {
-        "temperature": 20.6,
-        "rain_probability": 76.6,
-        "wind_speed": 4.0,
-        "humidity": 82.2
+        "temperature": 24.5,
+        "rain_probability": 9.8,
+        "wind_speed": 2.7,
+        "humidity": 65.7
       },
       "examples": [
-        "札幌 2019-08-28",
-        "那覇 2020-04-04",
-        "新潟 2021-05-16"
+        "熊本 2020-09-26",
+        "津 2022-06-02",
+        "神戸 2020-10-11"
       ],
       "category_share": {
-        "indoor": 0.983,
-        "relax": 0.015,
-        "outdoor": 0.001
+        "outdoor": 0.683,
+        "indoor": 0.181,
+        "relax": 0.136
       }
     },
     {
       "id": 2,
-      "name": "肌寒いくもりがちの日（風が強い）",
-      "count": 2983,
-      "share": 0.15120640713706407,
+      "name": "肌寒い晴れの日",
+      "count": 38565,
+      "share": 0.37433025314489826,
       "center": {
-        "temperature": 13.1,
-        "rain_probability": 17.7,
-        "wind_speed": 7.3,
-        "humidity": 58.9
+        "temperature": 10.7,
+        "rain_probability": 7.1,
+        "wind_speed": 3.9,
+        "humidity": 56.0
       },
       "examples": [
-        "那覇 2023-01-28",
-        "名古屋 2021-05-02",
-        "大阪 2020-04-02"
+        "松山 2019-03-16",
+        "山口 2021-11-12",
+        "名古屋 2022-03-05"
       ],
       "category_share": {
-        "relax": 0.375,
-        "indoor": 0.369,
-        "outdoor": 0.256
+        "relax": 0.595,
+        "outdoor": 0.298,
+        "indoor": 0.107
+      }
+    },
+    {
+      "id": 0,
+      "name": "過ごしやすい雨の日（じめじめ）",
+      "count": 24164,
+      "share": 0.2345472899518559,
+      "center": {
+        "temperature": 18.5,
+        "rain_probability": 76.4,
+        "wind_speed": 3.7,
+        "humidity": 82.4
+      },
+      "examples": [
+        "新潟 2021-05-27",
+        "奈良 2022-10-09",
+        "松江 2024-10-22"
+      ],
+      "category_share": {
+        "indoor": 0.982,
+        "relax": 0.018,
+        "outdoor": 0.0
       }
     }
   ],
   "holdout": {
-    "rows": 5373,
+    "rows": 28200,
     "date_from": "2025-01-01",
-    "date_to": "2026-08-20",
+    "date_to": "2026-08-23",
     "share": {
-      "0": 0.3527,
-      "1": 0.2215,
-      "2": 0.0583,
-      "3": 0.3676
+      "0": 0.2013,
+      "1": 0.4301,
+      "2": 0.3685
     }
   },
   "data": {
     "path": "data/weather_jp.csv",
-    "sha256": "84acade580d3714bb9434c6b104ce33d81cc5db1b9d90d44ec221576dac1bebb",
-    "rows": 19728,
-    "cities": 9,
+    "sha256": "0e5d4320e7bc1be7dfb4e9203db465d8a3364fbd72e80316289ef54510ca2ff8",
+    "rows": 103024,
+    "cities": 47,
     "date_from": "2019-01-01",
     "date_to": "2024-12-31"
   },
-  "version": "v1",
-  "git_sha": "f4c1853",
+  "version": "v2",
+  "git_sha": "3fdcf25",
   "environment": {
     "python": "3.13.14",
     "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
