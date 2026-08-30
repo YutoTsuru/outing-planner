@@ -9,6 +9,7 @@
 そのため、予測した天気には必ず予測区間（だいたいこの範囲）を添えて返します。
 """
 
+import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -170,3 +171,26 @@ class ForecastService:
     def cities(self) -> list[str]:
         """予報を出せる都市の一覧。"""
         return self.source.city_names()
+
+    def compare_tomorrow(self, cities: list[str] = None, days: int = 10) -> dict:
+        """複数都市の、あしたの予報をまとめて返す。
+
+        外部への通信を都市の数だけ行うため、連続で叩いて取得元の利用上限に
+        当たらないよう、1都市ごとに間隔をあけます（fetch_weather.py の
+        都市取得と同じ間隔を使う）。1都市ぶんの取得に失敗しても、
+        残りの都市は続けます（失敗は errors にまとめる）。
+        """
+        cities = cities or self.cities()
+        results = []
+        errors = []
+
+        for index, city in enumerate(cities):
+            try:
+                results.append(self.predict_tomorrow(city, days=days))
+            except ForecastUnavailableError as error:
+                errors.append({"city": city, "message": str(error)})
+
+            if index < len(cities) - 1:
+                time.sleep(CONFIG.data.request_interval_sec)
+
+        return {"results": results, "errors": errors}

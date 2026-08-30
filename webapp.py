@@ -24,6 +24,7 @@ import os
 from flask import Blueprint, Flask, redirect, render_template, request, url_for
 
 import api as api_module
+import city_comparison
 import geocoding
 import monitoring
 import prediction_log
@@ -210,6 +211,17 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
             raise WebError(str(error), 503) from error
 
         return render_template("monitor.html", report=report,
+                               labels=presentation.label_views(),
+                               fields_view=presentation.weather_fields())
+
+    @web.get("/compare")
+    def compare_page():
+        if forecast is None:
+            raise WebError("翌日予測モデルが読み込まれていません。python train_forecast.py を実行してください。", 503)
+
+        force = request.args.get("refresh") == "1"
+        data = city_comparison.get_comparison(forecast, force_refresh=force)
+        return render_template("compare.html", data=data,
                                labels=presentation.label_views(),
                                fields_view=presentation.weather_fields())
 

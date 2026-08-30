@@ -213,3 +213,26 @@ def test_監視画面が表示される(client):
     assert "ドリフト監視" in body
     assert "総合判定" in body
     assert "天気4項目のずれ" in body
+
+
+@needs_models
+def test_都市比較の画面が表示される(client, monkeypatch):
+    import webapp
+
+    def fake_get_comparison(service, force_refresh=False):
+        return {
+            "rankings": [
+                {"city": "那覇", "target_date": "2026-08-31",
+                 "weather": {"temperature": 28.0, "rain_probability": 5.0,
+                            "wind_speed": 3.0, "humidity": 60.0},
+                 "category": "outdoor", "comfort_score": 90.0,
+                 "weather_type_name": "過ごしやすい晴れの日", "confidence": 0.8},
+            ],
+            "errors": [], "fetched_at": 0.0, "ttl_seconds": 1800, "cache_age_seconds": 5,
+        }
+
+    monkeypatch.setattr(webapp.city_comparison, "get_comparison", fake_get_comparison)
+
+    body = text_of(client.get("/compare"))
+    assert "那覇" in body
+    assert "秒前に取得" in body

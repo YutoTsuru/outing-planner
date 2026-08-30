@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}都市を比べる ｜ お出かけプランナー{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>あしたはどこへ行くのが良いか</h2>
+  <p class="lead">
+    47都市それぞれの、あしたの天気予測から「おでかけ日和度」を出して、
+    高い順に並べています。1位が「あしたいちばん良さそうな都市」の目安です。
+  </p>
+
+  {% if data.errors %}
+  <div class="warn">
+    <ul>
+      {% for error in data.errors %}
+      <li>{{ error.city }}: {{ error.message }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <p class="lead" style="margin:0">
+    データの鮮度：{{ data.cache_age_seconds }}秒前に取得
+    （{{ data.ttl_seconds // 60 }}分ごとに自動で更新されます）。
+    <a href="{{ url_for('web.compare_page', refresh=1) }}">いますぐ更新する</a>
+  </p>
+</div>
+
+<div class="card">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>順位</th><th>都市</th><th class="num">日和度</th><th>おすすめ</th>
+          {% for field in fields_view %}<th class="num">{{ field.label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data.rankings %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ row.city }}</td>
+          <td class="num">
+            {% if row.comfort_score is not none %}{{ row.comfort_score | round | int }}点{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if row.category %}{{ labels[row.category].emoji }} {{ labels[row.category].name }}{% else %}—{% endif %}
+          </td>
+          {% for field in fields_view %}
+          <td class="num">{{ row.weather.get(field.name, "—") }}{{ field.unit if field.name in row.weather else "" }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <p class="lead" style="margin:0">
+    予測はすべて<a href="{{ url_for('web.forecast_page') }}">あしたの予報</a>と同じモデルを使っています。
+    予報の精度についての注意点は <code>doc/forecast.md</code> を参照してください。
+    JSON で取るなら <code>/api/compare</code>（<code>?refresh=1</code> で即時更新）。
+  </p>
+</div>
+
+{% endblock %}

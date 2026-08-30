@@ -10,6 +10,7 @@
     GET  /api/weather-types   天気タイプの一覧
     GET  /api/history         これまでの予測の記録と傾向
     GET  /api/monitor         学習データと最近の入力のずれ（ドリフト監視）
+    GET  /api/compare         全都市のあしたの予報を日和度が高い順に比較
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
     POST /api/predict/batch   まとめて予測（最大100件）
     GET  /api/forecast        あしたの天気と、そのおすすめ
@@ -25,6 +26,7 @@ from typing import Any
 
 from flask import Blueprint, Flask, jsonify, request
 
+import city_comparison
 import geocoding
 import planner
 import prediction_log
@@ -234,6 +236,20 @@ def build_blueprint(outing: OutingService, forecast: ForecastService | None) -> 
             raise ApiError(str(error), 503) from error
 
         return jsonify({"ok": True, **report})
+
+    @api.get("/compare")
+    def compare_cities():
+        """全都市の、あしたの予報を日和度が高い順にまとめて返す。
+
+        初回（キャッシュが無いとき）は都市の数だけ外部へ通信するため、
+        数十秒かかることがある。次回以降はキャッシュが効くので一瞬で返る。
+        """
+        if forecast is None:
+            raise ApiError("翌日予測モデルが読み込まれていません", 503)
+
+        force = request.args.get("refresh") == "1"
+        data = city_comparison.get_comparison(forecast, force_refresh=force)
+        return jsonify({"ok": True, **data})
 
     @api.get("/history")
     def history():
