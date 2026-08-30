@@ -57,19 +57,22 @@
 | 学習データ | 日本47都市（全都道府県庁所在地）・6年ぶんの**実測**気象データ 103,024日 |
 | 成績 | 正解率 **0.821**（理論上の上限 0.820 / 何もしないと 0.361） |
 | ファイル | `model/outing_model.pkl`（約 640 KB） |
-| 使われる場所 | [app.py](../app.py) の `predict_category()` |
+| 使われる場所 | [outing_ml/serve.py](../outing_ml/serve.py) の `OutingService.predict()`（[webapp.py](../webapp.py) から呼ばれる） |
 
 アプリの中では、こう呼ばれています。
 
 ```python
-model = joblib.load("model/outing_model.pkl")
+from outing_ml.serve import OutingService
 
-input_df = pd.DataFrame(
-    [[temperature, rain_probability, wind_speed, humidity]],
-    columns=["temperature", "rain_probability", "wind_speed", "humidity"],
-)
-label = model.predict(input_df)[0]        # 'outdoor' / 'indoor' / 'relax'
+service = OutingService.load()
+result = service.predict(temperature, rain_probability, wind_speed, humidity)
+result.category        # 'outdoor' / 'indoor' / 'relax'
+result.probabilities   # {'indoor': 0.11, 'outdoor': 0.85, 'relax': 0.04}
 ```
+
+`OutingService` は入力の検証（範囲外の値の丸め・学習データの範囲外への警告）も行います。
+生のモデルを直接 `joblib.load` して使うと、この検証を通らないので避けてください
+（くわしくは [outing_ml/serve.py](../outing_ml/serve.py)）。
 
 ---
 

@@ -1,7 +1,7 @@
 """地名から緯度経度を調べる。
 
 Google Maps →（使えなければ）OpenStreetMap の順に試します。
-画面（Gradio / Flask）と REST API の3か所から呼ばれるので、切り替えの順番と
+画面（Flask）と REST API から呼ばれるので、切り替えの順番と
 「見つからなかったときの扱い」をここ1か所に置きます。
 
 注意: maps_api.geocode も osm_api.geocode も、失敗すると None ではなく例外を投げます。
@@ -38,3 +38,16 @@ def resolve_area(query: str) -> tuple[float, float, str]:
         return osm_api.geocode(query)
     except osm_api.OsmError as error:
         raise AreaNotFoundError(f"「{query}」が見つかりませんでした（{error}）") from error
+
+
+def resolve_gps(latitude: float, longitude: float) -> str:
+    """緯度経度から地名を調べる（現在地からプランを作るときに使う）。
+
+    reverse_geocode はどちらも「分からなければ None」を返す設計なので
+    （resolve_area の geocode 系と違って例外にはしない）、素直に順番へ並べるだけでよい。
+    """
+    return (
+        maps_api.reverse_geocode(latitude, longitude)
+        or osm_api.reverse_geocode(latitude, longitude)
+        or "現在地周辺"
+    )

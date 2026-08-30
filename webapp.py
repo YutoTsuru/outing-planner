@@ -10,8 +10,7 @@
     /models        いま動いているモデルの版と成績
     /api/...       同じ機能を JSON で返す REST API（api.py）
 
-Gradio 版（app.py）と同じモデル・同じ文言を使っています。
-違うのは見た目だけで、予測はどちらも outing_ml.serve を通ります。
+予測はすべて outing_ml.serve を通ります。
 
 実行方法:
     python webapp.py                    # http://127.0.0.1:5000
@@ -200,10 +199,6 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         if category not in CATEGORIES:
             raise WebError("カテゴリが正しくありません")
 
-        area = (request.form.get("area") or "").strip()
-        if not area:
-            raise WebError("場所を入力してください（例：京都市）")
-
         try:
             radius_km = int(request.form.get("radius_km", 3))
         except ValueError:
@@ -211,10 +206,26 @@ def build_web_blueprint(outing: OutingService, forecast: ForecastService | None)
         if not 1 <= radius_km <= 20:
             raise WebError("探す範囲は 1〜20 km で指定してください")
 
-        try:
-            latitude, longitude, area_name = geocoding.resolve_area(area)
-        except geocoding.AreaNotFoundError as error:
-            raise WebError(f"{error}。市区町村名で入れてみてください。", 404) from error
+        # 現在地（ブラウザの位置情報）が送られてきたときは、それを優先する。
+        # 地名の入力より先に GPS の緯度経度を見るのは、画面側が「現在地から」
+        # モードのときだけ緯度経度を送るようにしているため（両方送られてくることはない）。
+        gps_latitude = request.form.get("gps_latitude")
+        gps_longitude = request.form.get("gps_longitude")
+
+        if gps_latitude and gps_longitude:
+            try:
+                latitude, longitude = float(gps_latitude), float(gps_longitude)
+            except ValueError:
+                raise WebError("現在地を正しく取得できませんでした。もう一度お試しください。") from None
+            area_name = geocoding.resolve_gps(latitude, longitude)
+        else:
+            area = (request.form.get("area") or "").strip()
+            if not area:
+                raise WebError("場所を入力してください（例：京都市）")
+            try:
+                latitude, longitude, area_name = geocoding.resolve_area(area)
+            except geocoding.AreaNotFoundError as error:
+                raise WebError(f"{error}。市区町村名で入れてみてください。", 404) from error
 
         text = planner.build_plan(
             category, latitude, longitude, area_name,

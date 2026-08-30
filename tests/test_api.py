@@ -460,7 +460,14 @@ def test_週間予報は都市の指定が要る(client):
 
 
 @needs_models
-def test_レート制限を超えると429になる(client):
+def test_レート制限を超えると429になる(client, monkeypatch):
+    # rate_limit は実時刻で1分の窓を区切っている。固定しないと、テストの実行が
+    # ちょうど分の境界をまたいだときだけ窓が切り替わってしまい、まれに失敗する
+    # （実際にこの境界またぎで失敗するのを確認した）。時刻を固定して再現性を持たせる。
+    import rate_limit
+
+    monkeypatch.setattr(rate_limit.time, "time", lambda: 1_000_000.0)
+
     for _ in range(60):
         assert client.post("/api/predict", json=GOOD_DAY).status_code == 200
 

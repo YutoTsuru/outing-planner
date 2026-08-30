@@ -1,7 +1,7 @@
 """
 お出かけプランナー：REST API（Flask）
 
-画面（Gradio）を通さずに、学習したモデルを HTTP から使えるようにします。
+画面を通さずに、学習したモデルを HTTP から使えるようにします。
 他のアプリから呼んだり、まとめて予測したり、動作確認を自動化したりするためのものです。
 
     GET  /api/health          読み込めているモデルと版
@@ -15,12 +15,13 @@
     POST /api/predict         天気4項目 → おすすめ・日和度・天気タイプ
     POST /api/predict/batch   まとめて予測（最大100件）
     GET  /api/forecast        あしたの天気と、そのおすすめ
+    GET  /api/week            数日先までの天気とおすすめ（再帰予測）
     POST /api/plan            時間つきのお出かけプラン（共有リンクも返す）
     GET  /api/share/<id>      共有リンクからプランを取り出す
 
 実行方法:
     python api.py                 # http://127.0.0.1:5000 で起動
-    python app.py                 # 画面と一緒に起動（/api で同じAPIが使える）
+    python webapp.py              # 画面と一緒に起動（/api で同じAPIが使える）
 """
 
 import os

@@ -170,6 +170,37 @@ def test_プランが作れる(client, monkeypatch):
 
 
 @needs_models
+def test_現在地からプランが作れる(client, monkeypatch):
+    import geocoding
+    import planner
+
+    monkeypatch.setattr(geocoding, "resolve_gps", lambda lat, lon: "東京都新宿区")
+    monkeypatch.setattr(geocoding, "resolve_area",
+                        lambda query: pytest.fail("GPSがあるのに地名検索に回った"))
+    monkeypatch.setattr(planner, "build_plan",
+                        lambda *args, **kwargs: "### 現在地のプラン")
+
+    body = text_of(client.post("/plan", data={
+        "category": "outdoor", "area": "現在地",
+        "gps_latitude": "35.6895", "gps_longitude": "139.6917",
+        "start_time": "10:00", "end_time": "15:00", "radius_km": "3",
+    }))
+
+    assert "東京都新宿区" in body
+    assert "現在地のプラン" in body
+
+
+@needs_models
+def test_現在地の緯度経度が壊れていたらエラー画面になる(client):
+    body = text_of(client.post("/plan", data={
+        "category": "outdoor", "gps_latitude": "abc", "gps_longitude": "139.6917",
+        "start_time": "10:00", "end_time": "15:00", "radius_km": "3",
+    }))
+
+    assert "正しく取得できませんでした" in body
+
+
+@needs_models
 def test_プランの共有リンクから同じ内容を開ける(client, monkeypatch, tmp_path):
     import re
 

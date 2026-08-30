@@ -46,12 +46,15 @@
 <div class="card">
   <h2>この日のプランを作る</h2>
   <p class="lead">場所と時間を決めると、実在するスポットを探して時間割にします（10秒ほどかかることがあります）。</p>
-  <form method="post" action="{{ url_for('web.plan_page') }}">
+  <form method="post" action="{{ url_for('web.plan_page') }}" id="plan-form">
     <input type="hidden" name="category" value="{{ result.category }}">
+    <input type="hidden" name="gps_latitude" id="gps-latitude" value="">
+    <input type="hidden" name="gps_longitude" id="gps-longitude" value="">
     <div class="fields">
       <div>
-        <label for="area">場所<span class="hint">市区町村・都道府県</span></label>
-        <input type="text" id="area" name="area" value="{{ area or '京都市' }}" required>
+        <label for="area">場所<span class="hint">市区町村・都道府県、または現在地</span></label>
+        <input type="text" id="area" name="area" value="{{ area or '京都市' }}" required
+               oninput="outingClearGps()">
       </div>
       <div>
         <label for="start_time">開始</label>
@@ -66,6 +69,41 @@
         <input type="number" id="radius_km" name="radius_km" value="3" min="1" max="20" step="1" required>
       </div>
     </div>
+    <button type="button" onclick="outingUseCurrentLocation()">現在地を使う</button>
+    <p class="lead" id="gps-status" role="status" style="margin:8px 0 0"></p>
     <button type="submit">プランを作る</button>
   </form>
 </div>
+
+<script>
+  // ブラウザの位置情報を取得し、hidden の緯度経度へ入れる。
+  // 位置情報は https か localhost でしか取得できない点に注意（ブラウザの制約）。
+  function outingUseCurrentLocation() {
+    const status = document.getElementById("gps-status");
+    if (!navigator.geolocation) {
+      status.textContent = "この端末では現在地を取得できません。";
+      return;
+    }
+    status.textContent = "現在地を取得しています…";
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        document.getElementById("gps-latitude").value = String(lat);
+        document.getElementById("gps-longitude").value = String(lon);
+        document.getElementById("area").value = "現在地";
+        status.textContent = "現在地を取得しました（" + lat.toFixed(4) + ", " + lon.toFixed(4) + "）";
+      },
+      () => {
+        status.textContent = "取得できませんでした。ブラウザで位置情報の利用を許可してください。";
+      },
+      { timeout: 10000 }
+    );
+  }
+
+  // 場所を手で入力し直したときは、古い現在地の緯度経度を優先させない。
+  function outingClearGps() {
+    document.getElementById("gps-latitude").value = "";
+    document.getElementById("gps-longitude").value = "";
+  }
+</script>
